@@ -1,0 +1,45 @@
+INSERT INTO workshop.workshop (
+    created_date, workshop_topic, workshop_title, workshop_objective,
+    workshop_description, workshop_instructions, is_workshop_deleted,
+    start_date_time, end_date_time, workshop_state
+) VALUES
+    ('2025-03-01 10:00:00.000000', 'Cybersecurity', 'Ethical Hacking Basics', 'Learn ethical hacking techniques',
+     'A workshop for cybersecurity beginners.', 'Bring your laptop with Kali Linux installed.', false,
+     '2025-04-02 09:00:00.000000', '2025-04-02 17:00:00.000000', 'UPCOMING'),
+
+    ('2025-02-20 11:30:00.000000', 'Data Science', 'Machine Learning 101', 'Introduction to ML models',
+     'Learn fundamental ML concepts.', 'Install Python and Jupyter Notebook.', true,
+     '2025-03-10 10:00:00.000000', '2025-03-10 16:00:00.000000', 'COMPLETED'),
+
+    ('2025-03-05 14:00:00.000000', 'Programming', 'Java for Beginners', 'Understand Java programming',
+     'A hands-on Java coding session.', 'Bring your laptop with JDK installed.', false,
+     '2025-03-25 14:00:00.000000', '2025-03-25 18:00:00.000000', 'ONGOING'),
+
+    ('2025-03-10 15:30:00.000000', 'Web Development', 'Full Stack Web Development', 'Front-end & Back-end Basics',
+     'Learn how to develop full-stack applications.', 'Install Node.js and VS Code.', true,
+     '2025-04-05 10:00:00.000000', '2025-04-05 17:00:00.000000', 'UPCOMING'),
+
+    ('2025-02-15 09:00:00.000000', 'Cloud Computing', 'AWS Basics', 'Introduction to AWS services',
+     'Learn AWS fundamentals.', 'Create a free AWS account before the workshop.', false,
+     '2025-02-28 10:00:00.000000', '2025-02-28 16:00:00.000000', 'COMPLETED'),
+
+    ('2025-03-08 10:00:00.000000', 'Cybersecurity', 'Network Security', 'Learn how to secure networks',
+     'Hands-on network security session.', 'Install Wireshark before the workshop.', false,
+     '2025-03-22 10:00:00.000000', '2025-03-22 16:00:00.000000', 'ONGOING'),
+
+    ('2025-02-18 12:00:00.000000', 'Blockchain', 'Blockchain Fundamentals', 'Understand how blockchain works',
+     'Learn about Bitcoin and Ethereum.', 'Install Metamask wallet.', false,
+     '2025-04-08 12:00:00.000000', '2025-04-08 18:00:00.000000', 'UPCOMING'),
+
+    ('2025-02-25 09:30:00.000000', 'AI & Robotics', 'AI in Robotics', 'Basics of AI in robotics',
+     'A practical AI robotics workshop.', 'Download TensorFlow library.', true,
+     '2025-03-18 10:00:00.000000', '2025-03-18 15:30:00.000000', 'COMPLETED'),
+
+    ('2025-03-01 08:45:00.000000', 'Cloud Computing', 'Azure DevOps', 'CI/CD Pipelines on Azure',
+     'Learn how to deploy applications using Azure DevOps.', 'Create an Azure free trial account.', false,
+     '2025-03-20 09:00:00.000000', '2025-03-20 14:00:00.000000', 'ONGOING'),
+
+    ('2025-03-07 11:00:00.000000', 'AI & Machine Learning', 'Deep Learning with TensorFlow', 'Neural Networks and Deep Learning',
+     'Explore deep learning techniques.', 'Install TensorFlow and Keras.', false,
+     '2025-04-15 10:00:00.000000', '2025-04-15 17:30:00.000000', 'UPCOMING');
+

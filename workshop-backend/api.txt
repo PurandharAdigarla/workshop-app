@@ -1,0 +1,30 @@
+admin login:(admin only)
+localhost:8080/admin/login
+
+create new workshop:(admin only)
+localhost:8080/workshop
+
+upcoming workshops:
+localhost:8080/workshop/upcoming
+
+ongoing workshops:
+localhost:8080/workshop/ongoing
+
+completed workshops:
+localhost:8080/workshop/completed
+
+signing up new attendee:
+localhost:8080/attendees/register
+
+attendee log in:
+localhost:8080/attendees/login
+
+attendee registering for a workshop:
+localhost:8080/workshop/register
+
+admin viewing all attendees:(admin only)
+localhost:8080/attendees
+
+admin viewing all registered attendees for a particular workshop(admin only)
+localhost:8080/workshop/{workshopId}/registrations
+

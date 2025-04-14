@@ -1,0 +1,245 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  IconButton,
+  Tabs,
+  Tab,
+  Box,
+  Paper,
+  Button,
+} from "@mui/material";
+import { DataGrid } from "@mui/x-data-grid";
+import AccountCircle from "@mui/icons-material/AccountCircle";
+import WorkshopDetailsDialog from "./WorkshopDetailsDialog";
+import RegisterForWorkshop from "./RegisterForWorkshop";
+import DeRegisterDialog from "./DeRegisterDialog";
+
+const tabLabels = ["ongoing", "upcoming", "completed", "registered"];
+
+export default function AttendeeDashboard() {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("ongoing");
+  const [tabIndex, setTabIndex] = useState(0);
+  const [workshops, setWorkshops] = useState([]);
+  const [registeredIds, setRegisteredIds] = useState([]);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedWorkshop, setSelectedWorkshop] = useState(null);
+  const [deRegisterDialogOpen, setDeRegisterDialogOpen] = useState(false);
+  const [workshopToDeregister, setWorkshopToDeregister] = useState(null);
+
+  const token = localStorage.getItem("accessToken");
+  const attendeeId = localStorage.getItem("attendeeId");
+
+  const handleTabChange = (e, newIndex) => {
+    setTabIndex(newIndex);
+    setActiveTab(tabLabels[newIndex]);
+  };
+
+  const fetchRegisteredIds = async () => {
+    try {
+      const res = await axios.get(
+        `http://localhost:8080/workshop/registered/${attendeeId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const registered = res.data || [];
+      const ids = registered.map((w) => Number(w.workshopId)).filter(Boolean);
+      setRegisteredIds(ids);
+    } catch (err) {
+      console.error("Failed to fetch registered workshop IDs", err);
+    }
+  };
+
+  const fetchWorkshops = async (type) => {
+    if (!token || !attendeeId) {
+      navigate("/attendee/login");
+      return;
+    }
+
+    try {
+      await fetchRegisteredIds();
+
+      let response;
+      if (type === "registered") {
+        response = await axios.get(
+          `http://localhost:8080/workshop/registered/${attendeeId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      } else {
+        response = await axios.get(
+          `http://localhost:8080/workshop/${type}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+      }
+
+      const formatted = (response.data || []).map((w, i) => ({
+        id: i + 1,
+        workshopId: Number(w.workshopId),
+        workshopTitle: w.workshopTitle,
+        workshopTopic: w.workshopTopic,
+        workshopObjective: w.workshopObjective,
+        workshopDescription: w.workshopDescription,
+        workshopInstructions: w.workshopInstructions,
+        startDate: new Date(w.startDate).toLocaleDateString(),
+        endDate: new Date(w.endDate).toLocaleDateString(),
+        workshopTutors:w.workshopTutors
+      }));
+
+      setWorkshops(formatted);
+    } catch (error) {
+      console.error("Fetch failed:", error);
+      localStorage.clear();
+      navigate("/attendee/login");
+    }
+  };
+
+  const handleRegister = async (workshopId) => {
+    const res = await RegisterForWorkshop(workshopId);
+    if (res.success) {
+      await fetchWorkshops(activeTab);
+    } else {
+      alert(res.error?.response?.data || "Registration failed");
+    }
+  };
+
+  useEffect(() => {
+    fetchWorkshops(activeTab);
+  }, [activeTab]);
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/attendee/login");
+  };
+
+  const columns = [
+    {
+      field: "workshopTitle",
+      headerName: "Title",
+      width: 400,
+      renderCell: (params) => (
+        <Button
+          variant="text"
+          onClick={() => {
+            setSelectedWorkshop(params.row);
+            setDetailsDialogOpen(true);
+          }}
+        >
+          {params.value}
+        </Button>
+      ),
+    },
+    { field: "workshopTopic", headerName: "Topic", width: 350 },
+    { field: "workshopTutors", headerName: "Tutors", width: 350 },
+    { field: "startDate", headerName: "Start", width: 200 },
+    { field: "endDate", headerName: "End", width: 200 },
+    {
+      field: "actions",
+      headerName: "Actions",
+      width: 200,
+      sortable: false,
+      renderCell: (params) => {
+        const isRegistered = registeredIds.includes(params.row.workshopId);
+
+        if (activeTab === "completed") {
+          return (
+            <Button variant="contained" disabled>
+              CLOSED
+            </Button>
+          );
+        }
+
+        if (activeTab === "registered") {
+          return (
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => {
+                setWorkshopToDeregister(params.row);
+                setDeRegisterDialogOpen(true);
+              }}
+            >
+              De-register
+            </Button>
+          );
+        }
+
+        return (
+          <Button
+            variant="outlined"
+            color={isRegistered ? "inherit" : "primary"}
+            disabled={isRegistered}
+            onClick={() => handleRegister(params.row.workshopId)}
+          >
+            {isRegistered ? "Registered" : "Register"}
+          </Button>
+        );
+      },
+    },
+  ];
+
+  return (
+    <Box sx={{ width: "100vw", height: "100vh", bgcolor: "#f9f9f9" }}>
+      <AppBar position="static" sx={{ px: 2 }}>
+        <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
+          <Typography variant="h6">Attendee Dashboard</Typography>
+          <IconButton color="inherit" onClick={handleLogout}>
+            <AccountCircle />
+          </IconButton>
+        </Toolbar>
+      </AppBar>
+
+      <Tabs
+        value={tabIndex}
+        onChange={handleTabChange}
+        indicatorColor="secondary"
+        textColor="primary"
+        variant="fullWidth"
+      >
+        {tabLabels.map((label, i) => (
+          <Tab key={i} label={label.toUpperCase()} />
+        ))}
+      </Tabs>
+
+      <Box sx={{ p: 3 }}>
+        <Paper sx={{ height: 424, width: "100%" }}>
+          <DataGrid
+            rows={workshops}
+            columns={columns}
+            pageSizeOptions={[6]}
+            initialState={{
+              pagination: { paginationModel: { pageSize: 6, page: 0 } },
+            }}
+          />
+        </Paper>
+      </Box>
+
+      <WorkshopDetailsDialog
+        open={detailsDialogOpen}
+        onClose={() => setDetailsDialogOpen(false)}
+        workshop={selectedWorkshop}
+      />
+
+<DeRegisterDialog
+  open={deRegisterDialogOpen}
+  onClose={() => setDeRegisterDialogOpen(false)}
+  attendeeId={attendeeId}
+  workshopId={workshopToDeregister?.workshopId}
+  onSuccess={async () => {
+     fetchWorkshops("registered");
+     fetchRegisteredIds();
+     setSuccessMessage("De-Registered successfully.");
+  }}
+/>
+
+    </Box>
+  );
+}
