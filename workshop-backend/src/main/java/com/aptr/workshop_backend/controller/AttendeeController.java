@@ -22,21 +22,29 @@ public class AttendeeController {
 
 
     @PostMapping("/signup")
+    @PreAuthorize("permitAll()")
     public ResponseEntity<String> signup(@RequestBody AttendeeRegisterDto dto) {
-        String result = attendeeService.signup(dto);
-        return ResponseEntity.ok(result);
+        try {
+            String result = attendeeService.signup(dto);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody AttendeeLoginDto dto) {
-        AttendeeAccessTokenDto token = attendeeService.loginAttendee(dto);
-        if (token != null) {
-            return ResponseEntity.ok(token);
-        } else {
-            return ResponseEntity.status(401).body("Invalid credentials");
+        try {
+            AttendeeAccessTokenDto token = attendeeService.loginAttendee(dto);
+            if (token != null) {
+                return ResponseEntity.ok(token);
+            } else {
+                return ResponseEntity.status(401).body("Invalid credentials");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(e.getMessage());
         }
     }
-
 
 
     @GetMapping

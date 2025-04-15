@@ -13,6 +13,7 @@ import {
   Button,
   Divider,
 } from "@mui/material";
+import LogoutIcon from '@mui/icons-material/Logout';
 import { DataGrid } from "@mui/x-data-grid";
 import AccountCircle from "@mui/icons-material/AccountCircle";
 import WorkshopDetailsDialog from "./WorkshopDetailsDialog";
@@ -229,7 +230,7 @@ export default function AttendeeDashboard() {
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
           <Typography variant="h6">Attendee Dashboard</Typography>
           <IconButton color="inherit" onClick={handleLogout}>
-            <AccountCircle />
+            <LogoutIcon />
           </IconButton>
         </Toolbar>
       </AppBar>

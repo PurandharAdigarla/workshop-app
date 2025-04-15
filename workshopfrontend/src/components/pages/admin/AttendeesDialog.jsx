@@ -12,12 +12,18 @@ import {
   Divider,
   CircularProgress,
   Box,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import axios from "axios";
+import AddAttendeeDialog from "./AddAttendeeDialog";
 
 function AttendeesDialog({ open, onClose, workshopId }) {
   const [attendees, setAttendees] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [addAttendeeDialogOpen, setAddAttendeeDialogOpen] = useState(false);
 
   const fetchAttendees = async () => {
     if (!workshopId) return;
@@ -25,7 +31,7 @@ function AttendeesDialog({ open, onClose, workshopId }) {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem("accessToken"); // Get token from storage
+      const token = localStorage.getItem("accessToken");
       const res = await axios.get(
         `http://localhost:8080/workshop/${workshopId}/registrations`,
         {
@@ -53,9 +59,33 @@ function AttendeesDialog({ open, onClose, workshopId }) {
     }
   }, [open, workshopId]);
 
+  const handleAddAttendee = () => {
+    setAddAttendeeDialogOpen(true);
+  };
+
+  const handleAttendeeAdded = () => {
+    fetchAttendees(); // Refresh the attendee list
+  };
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Registered Attendees</DialogTitle>
+      <DialogTitle>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">Workshop Attendees</Typography>
+          <Box>
+            <Tooltip title="Refresh list">
+              <IconButton onClick={fetchAttendees} disabled={loading}>
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Add new attendee">
+              <IconButton onClick={handleAddAttendee} disabled={loading} color="primary">
+                <PersonAddIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </Box>
+      </DialogTitle>
       <DialogContent dividers>
         {loading ? (
           <Box display="flex" justifyContent="center" py={3}>
@@ -91,8 +121,15 @@ function AttendeesDialog({ open, onClose, workshopId }) {
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Close</Button>
-        <Button variant="contained">Add New Attendee</Button>
       </DialogActions>
+      
+      {/* Add Attendee Dialog */}
+      <AddAttendeeDialog
+        open={addAttendeeDialogOpen}
+        onClose={() => setAddAttendeeDialogOpen(false)}
+        workshopId={workshopId}
+        onAttendeeAdded={handleAttendeeAdded}
+      />
     </Dialog>
   );
 }

@@ -12,8 +12,10 @@ import {
   Box,
   Paper,
 } from "@mui/material";
+import LogoutIcon from '@mui/icons-material/Logout';
+import EditNoteTwoToneIcon from '@mui/icons-material/EditNoteTwoTone';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { DataGrid } from "@mui/x-data-grid";
-import AccountCircle from "@mui/icons-material/AccountCircle";
 import AddWorkshopDialog from "./AddWorkshopDialog";
 import WorkshopDetailsDialog from "./WorkshopDetailsDialog";
 import AttendeesDialog from "./AttendeesDialog";
@@ -101,7 +103,7 @@ export default function AdminDashboard() {
     {
       field: "workshopTitle",
       headerName: "Title",
-      width: 350,
+      width: 400,
       renderCell: (params) => (
         <Button
           variant="text"
@@ -115,7 +117,7 @@ export default function AdminDashboard() {
       ),
     },
     { field: "workshopTopic", headerName: "Topic", width: 350 },
-    { field: "workshopTutors", headerName: "Tutors", width: 200 },
+    { field: "workshopTutors", headerName: "Tutors", width: 250 },
     { field: "startDate", headerName: "Start", width: 200 },
     { field: "endDate", headerName: "End", width: 200 },
     {
@@ -124,17 +126,27 @@ export default function AdminDashboard() {
       width: 400,
       sortable: false,
       renderCell: (params) => (
-        <Box sx={{ pt: "10px" }} display="flex" gap={1}>
+        <Box sx={{ pt: "10px" }} display="flex" gap={3}>
           {activeTab !== "completed" && (
-            <Button
+            <IconButton
               size="small"
               variant="outlined"
               onClick={() => handleEdit(params.row)}
             >
-              Edit
-            </Button>
+              <EditNoteTwoToneIcon/>
+            </IconButton>
           )}
-
+          <IconButton
+            size="small"
+            variant="outlined"
+            color="error"
+            onClick={() => {
+              setWorkshopToDelete(params.row.workshopId);
+              setConfirmDeleteOpen(true);
+            }}
+          >
+            <DeleteIcon/>
+          </IconButton>
           <Button
             size="small"
             variant="outlined"
@@ -145,17 +157,6 @@ export default function AdminDashboard() {
             }}
           >
             Attendees
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            color="error"
-            onClick={() => {
-              setWorkshopToDelete(params.row.workshopId);
-              setConfirmDeleteOpen(true);
-            }}
-          >
-            Delete
           </Button>
         </Box>
       ),
@@ -172,7 +173,7 @@ export default function AdminDashboard() {
               <b>Add Workshop</b>
             </Button>
             <IconButton color="inherit" onClick={handleLogout}>
-              <AccountCircle />
+              <LogoutIcon/>
             </IconButton>
           </Box>
         </Toolbar>
