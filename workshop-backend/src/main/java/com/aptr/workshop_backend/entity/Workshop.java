@@ -1,6 +1,5 @@
 package com.aptr.workshop_backend.entity;
 
-import com.aptr.workshop_backend.enums.Role;
 import com.aptr.workshop_backend.enums.WorkshopState;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

@@ -29,7 +29,9 @@ export default function DeleteWorkshopDialog({
         },
       });
       setLoading(false);
-      onDeleteSuccess(); 
+      if (typeof onDeleteSuccess === 'function') {
+        onDeleteSuccess();
+      }
       onClose();
     } catch (err) {
       console.error("Error deleting workshop:", err);

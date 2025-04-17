@@ -142,19 +142,26 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
     try {
       const token = localStorage.getItem('accessToken');
       
-      //Create the attendee account
-      const signupResponse = await axios.post(
-        'http://localhost:8080/attendees/signup',
-        formData
-      );
-      
-      if (signupResponse.status !== 200) {
-        throw new Error('Failed to create attendee account');
+      // Try to create the attendee account
+      try {
+        const signupResponse = await axios.post(
+          'http://localhost:8080/attendees/signup',
+          formData
+        );
+        
+        console.log("Signup successful:", signupResponse.data);
+      } catch (signupErr) {
+        // If the error is 409 (Conflict), the attendee already exists
+        if (signupErr.response?.status !== 409) {
+          console.error("Signup error:", signupErr);
+          throw new Error(typeof signupErr.response?.data === 'string' 
+            ? signupErr.response.data 
+            : 'Failed to create attendee account');
+        }
+        console.log("Attendee already exists, continuing with login attempt");
       }
       
-      console.log("Signup successful:", signupResponse.data);
-      
-      //Attempt to login with the new credentials to get the attendee ID
+      // Attempt to login with the credentials to get the attendee ID
       try {
         const loginResponse = await axios.post(
           'http://localhost:8080/attendees/login',
@@ -167,34 +174,18 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
         if (loginResponse.data && loginResponse.data.attendeeId) {
           console.log("Login successful, got attendee ID:", loginResponse.data.attendeeId);
           
-          //Register the attendee to the workshop
+          // Register the attendee to the workshop
           await registerAttendeeToWorkshop(loginResponse.data.attendeeId, token);
           
-          setSuccess(true);
-          
-          setFormData({
-            attendeeName: '',
-            attendeeEmail: '',
-            attendeePhoneNumber: '',
-            attendeePassword: ''
-          });
-          
-          if (onAttendeeAdded) {
-            onAttendeeAdded();
-          }
-          
-          setTimeout(() => {
-            onClose();
-            setSuccess(false);
-          }, 1500);
-          
+          handleSuccess();
           return; 
         }
       } catch (loginErr) {
-        console.warn("Couldn't login with new credentials:", loginErr);
+        console.warn("Couldn't login with credentials:", loginErr);
       }
       
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // If login fails or attendeeId is missing, try to find the attendee by email
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const attendeesResponse = await axios.get(
         'http://localhost:8080/attendees',
@@ -205,53 +196,50 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
         }
       );
       
-      console.log("All attendees:", attendeesResponse.data);
-      console.log("Looking for email:", formData.attendeeEmail);
-      
       const attendeeEmail = formData.attendeeEmail.toLowerCase().trim();
-      const attendee = attendeesResponse.data.find(a => {
-        console.log("Comparing", a.attendeeEmail?.toLowerCase().trim(), "with", attendeeEmail);
-        return a.attendeeEmail && a.attendeeEmail.toLowerCase().trim() === attendeeEmail;
-      });
+      const attendee = attendeesResponse.data.find(a => 
+        a.attendeeEmail && a.attendeeEmail.toLowerCase().trim() === attendeeEmail
+      );
       
       if (!attendee) {
-        console.error("Could not find attendee with email:", attendeeEmail);
-        console.error("Available attendees:", attendeesResponse.data.map(a => a.attendeeEmail));
-        throw new Error('Could not find newly created attendee by email');
+        throw new Error('Could not find attendee by email');
       }
       
       if (!attendee.attendeeId) {
-        console.error("Found attendee but missing ID:", attendee);
         throw new Error('Found attendee but missing ID');
       }
       
-      console.log("Found attendee:", attendee);
-      
+      // Register the attendee to the workshop
       await registerAttendeeToWorkshop(attendee.attendeeId, token);
       
-      setSuccess(true);
-      
-      setFormData({
-        attendeeName: '',
-        attendeeEmail: '',
-        attendeePhoneNumber: '',
-        attendeePassword: ''
-      });
-      
-      if (onAttendeeAdded) {
-        onAttendeeAdded();
-      }
-      
-      setTimeout(() => {
-        onClose();
-        setSuccess(false);
-      }, 1500);
+      handleSuccess();
     } catch (err) {
       console.error('Error adding attendee:', err);
-      setError(err.response?.data || 'Failed to add attendee. Please try again.');
+      setError(typeof err.message === 'string' ? err.message : 'Failed to add attendee. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to handle successful registration
+  const handleSuccess = () => {
+    setSuccess(true);
+    
+    setFormData({
+      attendeeName: '',
+      attendeeEmail: '',
+      attendeePhoneNumber: '',
+      attendeePassword: ''
+    });
+    
+    if (onAttendeeAdded) {
+      onAttendeeAdded();
+    }
+    
+    setTimeout(() => {
+      onClose();
+      setSuccess(false);
+    }, 1500);
   };
 
   const handleSubmitExisting = async () => {
@@ -282,10 +270,23 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
       }, 1500);
     } catch (err) {
       console.error('Error adding existing attendee:', err);
-      if (err.response?.data?.includes('already registered')) {
+      
+      // Check if it's a conflict error (attendee already registered)
+      if (err.response && err.response.status === 409) {
         setExistingAttendeeError('This attendee is already registered for this workshop');
       } else {
-        setExistingAttendeeError(err.response?.data || 'Failed to add attendee. Please try again.');
+        // Safely extract error message
+        let errorMessage = 'Failed to add attendee. Please try again.';
+        
+        if (err.response) {
+          if (typeof err.response.data === 'string') {
+            errorMessage = err.response.data;
+          } else if (err.response.data && typeof err.response.data.message === 'string') {
+            errorMessage = err.response.data.message;
+          }
+        }
+          
+        setExistingAttendeeError(errorMessage);
       }
     } finally {
       setLoading(false);
@@ -293,25 +294,30 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
   };
 
   const registerAttendeeToWorkshop = async (attendeeId, token) => {
-    const registrationResponse = await axios.post(
-      'http://localhost:8080/workshop/register',
-      {
-        attendeeId: attendeeId,
-        workshopId: workshopId
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+    try {
+      const registrationResponse = await axios.post(
+        'http://localhost:8080/workshop/register',
+        {
+          attendeeId: attendeeId,
+          workshopId: workshopId
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         }
+      );
+      
+      return registrationResponse;
+    } catch (error) {
+      // If conflict (already registered), don't treat as error since the goal is achieved
+      if (error.response && error.response.status === 409) {
+        console.log("Attendee already registered for this workshop");
+        return { status: 200, data: "Already registered" };
       }
-    );
-    
-    if (registrationResponse.status !== 200) {
-      throw new Error('Failed to register attendee to workshop');
+      throw error;
     }
-    
-    return registrationResponse;
   };
 
   return (
@@ -394,7 +400,6 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
                   value={formData.attendeePassword}
                   onChange={handleChange}
                   disabled={loading}
-                  helperText="Minimum 6 characters"
                 />
               </Grid>
             </Grid>
@@ -435,9 +440,10 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
                   {filteredAttendees.map((attendee, index) => (
                     <React.Fragment key={attendee.attendeeId}>
                       <ListItem 
-                        button
+                        component="div"
                         selected={selectedExistingAttendee?.attendeeId === attendee.attendeeId}
                         onClick={() => setSelectedExistingAttendee(attendee)}
+                        sx={{ cursor: 'pointer' }}
                       >
                         <ListItemText
                           primary={attendee.attendeeName}
@@ -462,7 +468,7 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
             )}
             
             {selectedExistingAttendee && (
-              <Box mt={2} p={2} bgcolor="rgba(0, 0, 0, 0.04)" borderRadius={1}>
+              <Box mt={2} p={2} bgcolor="rgba(182, 244, 181, 0.55)" borderRadius={1}>
                 <Typography variant="subtitle2">Selected Attendee:</Typography>
                 <Typography variant="body1">{selectedExistingAttendee.attendeeName}</Typography>
                 <Typography variant="body2">{selectedExistingAttendee.attendeeEmail}</Typography>

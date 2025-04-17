@@ -28,7 +28,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
         String errorMessage = "Invalid request format";
         
-        // Check if it's a date format issue
         if (ex.getCause() != null) {
             Throwable rootCause = getRootCause(ex);
             if (rootCause instanceof DateTimeParseException || rootCause instanceof DateTimeException) {

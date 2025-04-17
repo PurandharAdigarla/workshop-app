@@ -363,7 +363,7 @@ export default function AdminDashboard() {
         open={confirmDeleteOpen}
         onClose={() => setConfirmDeleteOpen(false)}
         workshopId={workshopToDelete}
-        onSuccess={() => handleActionSuccess("Workshop deleted successfully")}
+        onDeleteSuccess={() => handleActionSuccess("Workshop deleted successfully")}
       />
 
       <Snackbar 
