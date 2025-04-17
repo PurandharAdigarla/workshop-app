@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import {
   AppBar,
@@ -11,21 +11,30 @@ import {
   Tab,
   Box,
   Paper,
+  Divider,
+  Container,
+  Alert,
+  Snackbar,
+  useTheme,
 } from "@mui/material";
 import LogoutIcon from '@mui/icons-material/Logout';
-import EditNoteTwoToneIcon from '@mui/icons-material/EditNoteTwoTone';
+import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 import { DataGrid } from "@mui/x-data-grid";
 import AddWorkshopDialog from "./AddWorkshopDialog";
 import WorkshopDetailsDialog from "./WorkshopDetailsDialog";
 import AttendeesDialog from "./AttendeesDialog";
 import EditWorkshopDialog from "./EditWorkshopDialog";
 import DeleteWorkshopDialog from "./DeleteWorkshopDialog";
+import FeedbacksTable from "./FeedbacksTable";
  
 const tabLabels = ["ongoing", "upcoming", "completed"];
 
 export default function AdminDashboard() {
+  const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("ongoing");
   const [tabIndex, setTabIndex] = useState(0);
   const [workshops, setWorkshops] = useState([]);
@@ -38,13 +47,25 @@ export default function AdminDashboard() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [workshopToDelete, setWorkshopToDelete] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
       navigate("/admin/login");
     }
-  }, []);
+    
+    window.history.pushState(null, "", location.pathname);
+    const preventNavigation = (e) => {
+      window.history.pushState(null, "", location.pathname);
+    };
+    
+    window.addEventListener("popstate", preventNavigation);
+    
+    return () => {
+      window.removeEventListener("popstate", preventNavigation);
+    };
+  }, [navigate, location.pathname]);
 
   const handleTabChange = (e, newIndex) => {
     setTabIndex(newIndex);
@@ -98,12 +119,29 @@ export default function AdminDashboard() {
     setOpenEditDialog(true);
   };
 
+  const handleActionSuccess = (message) => {
+    setSuccessMessage(message);
+    setSnackbarOpen(true);
+    fetchWorkshops(activeTab);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+    setSuccessMessage("");
+  };
+
   const columns = [
-    { field: "workshopId", headerName: "Workshop Id", width: 140 },
+    { 
+      field: "workshopId", 
+      headerName: "ID", 
+      width: 80,
+      align: 'center',
+      headerAlign: 'center',
+    },
     {
       field: "workshopTitle",
       headerName: "Title",
-      width: 400,
+      width: 300,
       renderCell: (params) => (
         <Button
           variant="text"
@@ -111,41 +149,77 @@ export default function AdminDashboard() {
             setSelectedWorkshop(params.row);
             setDetailsDialogOpen(true);
           }}
+          sx={{ 
+            justifyContent: 'flex-start', 
+            textAlign: 'left',
+            width: '100%',
+          }}
         >
           {params.value}
         </Button>
       ),
     },
-    { field: "workshopTopic", headerName: "Topic", width: 350 },
-    { field: "workshopTutors", headerName: "Tutors", width: 250 },
-    { field: "startDate", headerName: "Start", width: 200 },
-    { field: "endDate", headerName: "End", width: 200 },
+    { 
+      field: "workshopTopic", 
+      headerName: "Topic", 
+      width: 200,
+    },
+    { 
+      field: "workshopTutors", 
+      headerName: "Tutors", 
+      width: 200,
+      headerAlign: 'center',
+      align: 'center',
+    },
+    { 
+      field: "startDate", 
+      headerName: "Start Date", 
+      width: 200,
+      align: 'center',
+      headerAlign: 'center',
+    },
+    { 
+      field: "endDate", 
+      headerName: "End Date", 
+      width: 200,
+      align: 'center',
+      headerAlign: 'center',
+    },
     {
       field: "actions",
       headerName: "Actions",
-      width: 400,
+      width: 300,
       sortable: false,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => (
-        <Box sx={{ pt: "10px" }} display="flex" gap={3}>
+        <Box sx={{ 
+          display: "flex", 
+          gap: 1, 
+          justifyContent: 'center', 
+          width: '100%', 
+          pt: 1,
+        }}>
           {activeTab !== "completed" && (
             <IconButton
               size="small"
-              variant="outlined"
+              color="primary"
               onClick={() => handleEdit(params.row)}
+              sx={{ borderRadius: 1 }}
             >
-              <EditNoteTwoToneIcon/>
+              <EditIcon fontSize="small" />
             </IconButton>
           )}
           <IconButton
             size="small"
-            variant="outlined"
             color="error"
             onClick={() => {
               setWorkshopToDelete(params.row.workshopId);
               setConfirmDeleteOpen(true);
             }}
+            sx={{ borderRadius: 1 }}
           >
-            <DeleteIcon/>
+            <DeleteIcon fontSize="small" />
           </IconButton>
           <Button
             size="small"
@@ -155,6 +229,7 @@ export default function AdminDashboard() {
               setSelectedWorkshopId(params.row.workshopId);
               setAttendeesDialogOpen(true);
             }}
+            sx={{ ml: 1, borderRadius: 1 }}
           >
             Attendees
           </Button>
@@ -164,45 +239,94 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <Box sx={{ width: "100vw", height: "100vh", bgcolor: "#f9f9f9" }}>
-      <AppBar position="static" sx={{ px: 2 }}>
+    <Box sx={{ 
+      minHeight: "100vh", 
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <AppBar position="static">
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
           <Typography variant="h6">Admin Dashboard</Typography>
           <Box display="flex" alignItems="center" gap={2}>
-            <Button variant="contained" onClick={() => setOpenDialog(true)}>
-              <b>Add Workshop</b>
+            <Button 
+              variant="contained" 
+              color="secondary"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenDialog(true)}
+            >
+              Add Workshop
             </Button>
-            <IconButton color="inherit" onClick={handleLogout}>
-              <LogoutIcon/>
+            <IconButton color="inherit" onClick={handleLogout} size="large">
+              <LogoutIcon />
             </IconButton>
           </Box>
         </Toolbar>
       </AppBar>
 
-      <Tabs
-        value={tabIndex}
-        onChange={handleTabChange}
-        indicatorColor="secondary"
-        textColor="primary"
-        variant="fullWidth"
-      >
-        {tabLabels.map((label, i) => (
-          <Tab key={i} label={label.toUpperCase()} />
-        ))}
-      </Tabs>
+      <Box sx={{ bgcolor: theme.palette.background.paper }}>
+        <Container maxWidth="xl">
+          <Tabs
+            value={tabIndex}
+            onChange={handleTabChange}
+            indicatorColor="primary"
+            textColor="primary"
+            variant="fullWidth"
+            sx={{ mt: 1 }}
+          >
+            {tabLabels.map((label, i) => (
+              <Tab 
+                key={i} 
+                label={label.charAt(0).toUpperCase() + label.slice(1)} 
+              />
+            ))}
+          </Tabs>
+        </Container>
+      </Box>
 
-      <Box sx={{ p: 3 }}>
-        <Paper sx={{ height: 423, width: "100%" }}>
+      <Container maxWidth="xl" sx={{ flex: 1, mt: 4, mb: 6 }}>
+        <Typography 
+          variant="h5" 
+          color="primary" 
+          gutterBottom 
+          sx={{ mb: 3, pl: 1 }}
+        >
+          {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Workshops
+        </Typography>
+        
+        <Paper 
+          elevation={1} 
+          sx={{ 
+            width: "100%", 
+            borderRadius: 2,
+            overflow: 'hidden',
+          }}
+        >
           <DataGrid
             rows={workshops}
             columns={columns}
-            pageSizeOptions={[6]}
+            autoHeight
+            disableRowSelectionOnClick
+            pageSizeOptions={[5, 10]}
             initialState={{
-              pagination: { paginationModel: { pageSize: 6, page: 0 } },
+              pagination: { paginationModel: { pageSize: 5, page: 0 } },
             }}
           />
         </Paper>
-      </Box>
+      
+        {/* Feedbacks Section */}
+        <Box sx={{ mt: 6 }}>
+          <Divider sx={{ mb: 4 }} />
+          <Typography 
+            variant="h5" 
+            color="primary"
+            gutterBottom 
+            sx={{ mb: 3, pl: 1 }}
+          >
+            Workshop Feedbacks
+          </Typography>
+          <FeedbacksTable />
+        </Box>
+      </Container>
 
       <AddWorkshopDialog
         open={openDialog}
@@ -210,6 +334,7 @@ export default function AdminDashboard() {
           setOpenDialog(false);
           fetchWorkshops(activeTab);
         }}
+        onSuccess={() => handleActionSuccess("Workshop added successfully")}
       />
 
       <WorkshopDetailsDialog
@@ -231,17 +356,31 @@ export default function AdminDashboard() {
           fetchWorkshops(activeTab);
         }}
         workshop={selectedWorkshop}
+        onSuccess={() => handleActionSuccess("Workshop updated successfully")}
       />
 
       <DeleteWorkshopDialog
         open={confirmDeleteOpen}
         onClose={() => setConfirmDeleteOpen(false)}
         workshopId={workshopToDelete}
-        onDeleteSuccess={() => {
-          fetchWorkshops(activeTab);
-          setSuccessMessage("Workshop deleted successfully.");
-        }}
+        onSuccess={() => handleActionSuccess("Workshop deleted successfully")}
       />
+
+      <Snackbar 
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity="success" 
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

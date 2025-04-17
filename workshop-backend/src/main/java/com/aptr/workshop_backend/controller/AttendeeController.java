@@ -1,9 +1,15 @@
 package com.aptr.workshop_backend.controller;
 
-import com.aptr.workshop_backend.config.jwt.JwtUtil;
-import com.aptr.workshop_backend.dto.*;
+import com.aptr.workshop_backend.dto.AttendeeAccessTokenDto;
+import com.aptr.workshop_backend.dto.AttendeeDto;
+import com.aptr.workshop_backend.dto.AttendeeLoginDto;
+import com.aptr.workshop_backend.dto.AttendeeRegisterDto;
+import com.aptr.workshop_backend.exception.ConflictException;
+import com.aptr.workshop_backend.exception.UnauthorizedException;
 import com.aptr.workshop_backend.service.AttendeeService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -15,37 +21,23 @@ import java.util.List;
 @RestController
 @RequestMapping("/attendees")
 @RequiredArgsConstructor
+@Slf4j
 public class AttendeeController {
-
     private final AttendeeService attendeeService;
-    private final JwtUtil jwtUtil;
-
 
     @PostMapping("/signup")
     @PreAuthorize("permitAll()")
     public ResponseEntity<String> signup(@RequestBody AttendeeRegisterDto dto) {
-        try {
-            String result = attendeeService.signup(dto);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        String result = attendeeService.signup(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody AttendeeLoginDto dto) {
-        try {
-            AttendeeAccessTokenDto token = attendeeService.loginAttendee(dto);
-            if (token != null) {
-                return ResponseEntity.ok(token);
-            } else {
-                return ResponseEntity.status(401).body("Invalid credentials");
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(401).body(e.getMessage());
-        }
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<AttendeeAccessTokenDto> login(@RequestBody AttendeeLoginDto dto) {
+        AttendeeAccessTokenDto token = attendeeService.loginAttendee(dto);
+        return ResponseEntity.ok(token);
     }
-
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")

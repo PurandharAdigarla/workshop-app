@@ -14,14 +14,19 @@ public class Attendee {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long attendeeId;
+    
     @Column(unique = true, nullable = false)
     private String attendeeEmail;
+    
     @Column(unique = true, nullable = false)
     private String attendeePhoneNumber;
+    
     @Column(nullable = false)
     private String attendeeName;
+    
     @Column(nullable = false)
     private String attendeePassword;
+    
     @Enumerated(EnumType.STRING)
     private Role role = Role.ATTENDEE;
 }

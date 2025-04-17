@@ -1,28 +1,31 @@
 package com.aptr.workshop_backend.service;
 
-import com.aptr.workshop_backend.dto.AttendeeResponseDto;
-import com.aptr.workshop_backend.dto.FeedbackDto;
-import com.aptr.workshop_backend.dto.WorkshopDto;
-import com.aptr.workshop_backend.dto.WorkshopRegistrationRequestDto;
+import com.aptr.workshop_backend.dto.*;
 import com.aptr.workshop_backend.entity.Attendee;
 import com.aptr.workshop_backend.entity.AttendeeWorkshopRegistration;
 import com.aptr.workshop_backend.entity.Workshop;
 import com.aptr.workshop_backend.enums.WorkshopState;
+import com.aptr.workshop_backend.exception.BadRequestException;
+import com.aptr.workshop_backend.exception.ConflictException;
+import com.aptr.workshop_backend.exception.ResourceNotFoundException;
 import com.aptr.workshop_backend.mapper.WorkshopMapper;
 import com.aptr.workshop_backend.repository.AttendeeRepo;
 import com.aptr.workshop_backend.repository.AttendeeWorkshopRegistrationRepo;
 import com.aptr.workshop_backend.repository.WorkshopRepo;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WorkshopService {
     private final WorkshopRepo workshopRepo;
     private final AttendeeRepo attendeeRepo;
@@ -144,32 +147,38 @@ public class WorkshopService {
         }
     }
 
-
     public String registerAttendeeToWorkshop(WorkshopRegistrationRequestDto dto) {
-        Optional<Attendee> attendee = attendeeRepo.findById(dto.attendeeId());
-        Optional<Workshop> workshop = workshopRepo.findById(dto.workshopId());
+        Attendee attendee = attendeeRepo.findById(dto.attendeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Attendee", "id", dto.attendeeId()));
+        
+        Workshop workshop = workshopRepo.findById(dto.workshopId())
+                .orElseThrow(() -> new ResourceNotFoundException("Workshop", "id", dto.workshopId()));
 
-        if (attendee.isEmpty() || workshop.isEmpty()) {
-            return "Attendee or Workshop not found";
+        if (workshop.getWorkshopState() == WorkshopState.COMPLETED) {
+            throw new BadRequestException("Cannot register for a completed workshop");
         }
-        Workshop foundWorkshop = workshop.get();
-        if (foundWorkshop.getWorkshopState() == WorkshopState.COMPLETED) {
-            return "Cannot register for a completed workshop";
-        }
+        
         boolean alreadyRegistered = attendeeWorkshopRegistrationRepo
                 .existsByAttendee_AttendeeIdAndWorkshop_WorkshopId(dto.attendeeId(), dto.workshopId());
+        
         if (alreadyRegistered) {
-            return "Attendee already registered for this workshop";
+            throw new ConflictException("Registration", "workshop", dto.workshopId());
         }
-        AttendeeWorkshopRegistration registration = new AttendeeWorkshopRegistration();
-        registration.setAttendee(attendee.get());
-        registration.setWorkshop(foundWorkshop);
-        registration.setRegistrationTime(new Date());
+        
+        try {
+            AttendeeWorkshopRegistration registration = new AttendeeWorkshopRegistration();
+            registration.setAttendee(attendee);
+            registration.setWorkshop(workshop);
+            registration.setRegistrationTime(new Date());
 
-        attendeeWorkshopRegistrationRepo.save(registration);
-        return "Registration successful";
+            attendeeWorkshopRegistrationRepo.save(registration);
+            log.info("Attendee {} successfully registered for workshop {}", dto.attendeeId(), dto.workshopId());
+            return "Registration successful";
+        } catch (Exception e) {
+            log.error("Error during workshop registration: {}", e.getMessage());
+            throw new BadRequestException("Registration failed: " + e.getMessage());
+        }
     }
-
 
     public String deregisterAttendeeFromWorkshop(WorkshopRegistrationRequestDto dto) {
         Optional<AttendeeWorkshopRegistration> registrationOpt =
@@ -186,8 +195,6 @@ public class WorkshopService {
         return "Deregistration successful";
     }
 
-
-
     public String softDeleteWorkshop(Long workshopId) {
         Optional<Workshop> optional = workshopRepo.findById(workshopId);
         if (optional.isEmpty()) {
@@ -201,7 +208,6 @@ public class WorkshopService {
         workshopRepo.save(workshop);
         return "Workshop soft deleted successfully";
     }
-
 
     public List<AttendeeResponseDto> getRegistrationsByWorkshopId(Long workshopId) {
         return attendeeWorkshopRegistrationRepo.findAttendeesByWorkshopId(workshopId);
@@ -277,6 +283,57 @@ public class WorkshopService {
         return registrations.stream()
                 .map(reg -> workshopMapper.workshopToWorkshopDto(reg.getWorkshop()))
                 .collect(Collectors.toList());
+    }
+
+    public List<WorkshopFeedbackDto> getAllWorkshopFeedbacks() {
+        List<Long> workshopIds = attendeeWorkshopRegistrationRepo.findWorkshopIdsWithFeedback();
+        
+        return workshopIds.stream()
+            .map(this::getWorkshopFeedback)
+            .filter(dto -> dto != null)
+            .collect(Collectors.toList());
+    }
+    
+    public WorkshopFeedbackDto getWorkshopFeedback(Long workshopId) {
+        Optional<Workshop> workshopOpt = workshopRepo.findById(workshopId);
+        
+        if (workshopOpt.isEmpty()) {
+            return null;
+        }
+        
+        Workshop workshop = workshopOpt.get();
+        Double avgRating = attendeeWorkshopRegistrationRepo.getAverageRatingForWorkshop(workshopId);
+        
+        if (avgRating == null) {
+            return new WorkshopFeedbackDto(
+                workshopId,
+                workshop.getWorkshopTitle(),
+                workshop.getStartDate(),
+                workshop.getEndDate(),
+                0.0,
+                0,
+                List.of()
+            );
+        }
+        
+        List<FeedbackDetailsDto> feedbacks = attendeeWorkshopRegistrationRepo.findFeedbacksByWorkshopId(workshopId)
+            .stream()
+            .map(reg -> new FeedbackDetailsDto(
+                reg.getAttendee().getAttendeeName(),
+                reg.getRating(),
+                reg.getComment()
+            ))
+            .collect(Collectors.toList());
+        
+        return new WorkshopFeedbackDto(
+            workshopId,
+            workshop.getWorkshopTitle(),
+            workshop.getStartDate(),
+            workshop.getEndDate(),
+            avgRating,
+            feedbacks.size(),
+            feedbacks
+        );
     }
 
 }

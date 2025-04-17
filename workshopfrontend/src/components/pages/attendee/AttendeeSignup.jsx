@@ -11,22 +11,65 @@ import {
   Typography,
   Container,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Snackbar
 } from '@mui/material';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 
 export default function AttendeeSignup() {
   const [formData, setFormData] = useState({
-    attendeeName: '',
-    attendeeEmail: '',
-    attendeePhoneNumber: '',
-    attendeePassword: '',
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
     confirmPassword: ''
   });
-  const [error, setError] = useState('');
+  
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required';
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = 'Name must be at least 2 characters';
+    }
+    
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email address is invalid';
+    }
+    
+    // Phone validation
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
+      newErrors.phone = 'Phone number must be 10 digits';
+    }
+    
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+    
+    // Confirm password validation
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -34,128 +77,66 @@ export default function AttendeeSignup() {
       ...formData,
       [name]: value
     });
-  };
-
-  const validateForm = () => {
-    if (!formData.attendeeName.trim()) {
-      setError('Name is required');
-      return false;
-    }
     
-    if (!formData.attendeeEmail.trim()) {
-      setError('Email is required');
-      return false;
+    // Clear specific field error when typing
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: ''
+      });
     }
-    
-    if (!formData.attendeePhoneNumber.trim()) {
-      setError('Phone number is required');
-      return false;
-    }
-    
-    if (!formData.attendeePassword.trim()) {
-      setError('Password is required');
-      return false;
-    }
-    
-    if (formData.attendeePassword.length < 6) {
-      setError('Password must be at least 6 characters');
-      return false;
-    }
-    
-    if (formData.attendeePassword !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return false;
-    }
-    
-    return true;
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
     
     setLoading(true);
-    setError('');
-    
+    setFormError('');
+
     try {
-      console.log("Sending signup request:", {
-        attendeeName: formData.attendeeName,
-        attendeeEmail: formData.attendeeEmail,
-        attendeePhoneNumber: formData.attendeePhoneNumber
+      // Submit signup data
+      const response = await axios.post('http://localhost:8080/attendees/signup', {
+        attendeeName: formData.name,
+        attendeeEmail: formData.email,
+        attendeePhone: formData.phone,
+        attendeePassword: formData.password
       });
       
-      const signupResponse = await axios.post(
-        'http://localhost:8080/attendees/signup',
-        {
-          attendeeName: formData.attendeeName,
-          attendeeEmail: formData.attendeeEmail,
-          attendeePhoneNumber: formData.attendeePhoneNumber,
-          attendeePassword: formData.attendeePassword
-        }
-      );
+      setSuccess(true);
       
-      console.log("Signup response:", signupResponse);
-      
-      if (signupResponse.status === 200) {
-        if (signupResponse.data === "Email already in use") {
-          setError('This email is already registered. Please use a different email or login instead.');
-          setLoading(false);
-          return;
-        }
+      // Auto login after successful signup
+      try {
+        const loginResponse = await axios.post('http://localhost:8080/attendees/login', {
+          attendeeEmail: formData.email,
+          attendeePassword: formData.password
+        });
         
-        if (signupResponse.data === "Phone number already in use") {
-          setError('This phone number is already registered. Please use a different phone number.');
-          setLoading(false);
-          return;
-        }
-        
-        if (signupResponse.data !== "Attendee registered successfully") {
-          setError(signupResponse.data || 'Registration failed. Please try again.');
-          setLoading(false);
-          return;
-        }
-        
-        setSuccess(true);
-        
-        // Try to log in automatically
-        try {
-          const loginResponse = await axios.post('http://localhost:8080/attendees/login', {
-            attendeeEmail: formData.attendeeEmail,
-            attendeePassword: formData.attendeePassword,
-          });
-    
-          if (loginResponse.data.accessToken) {
-            localStorage.setItem('accessToken', loginResponse.data.accessToken);
-            localStorage.setItem('attendeeId', loginResponse.data.attendeeId);
-            setTimeout(() => {
-              navigate('/attendee/dashboard');
-            }, 1500);
-          }
-        } catch (loginErr) {
-          console.error('Auto-login error:', loginErr);
-          // Don't show error for this, just redirect to login page after delay
+        if (loginResponse.data.accessToken) {
+          localStorage.setItem('accessToken', loginResponse.data.accessToken);
+          localStorage.setItem('attendeeId', loginResponse.data.attendeeId);
+          
+          // Give time for success message to be seen
           setTimeout(() => {
-            navigate('/attendee/login');
-          }, 2000);
+            navigate('/attendee/dashboard');
+          }, 1500);
         }
-      } else {
-        setError('Registration failed. Please try again.');
+      } catch (loginErr) {
+        console.error('Auto login failed:', loginErr);
+        // If auto-login fails, redirect to login page after showing success
+        setTimeout(() => {
+          navigate('/attendee/login');
+        }, 2000);
       }
     } catch (err) {
       console.error('Signup error:', err);
-      
-      // Display specific backend validation errors
-      if (err.response) {
-        if (typeof err.response.data === 'string') {
-          setError(err.response.data);
-        } else {
-          setError('Registration failed. Please check your information and try again.');
-        }
-      } else if (err.request) {
-        setError('No response from server. Please check your internet connection.');
+      if (err.response?.status === 409) {
+        setFormError('Email or phone number already in use');
       } else {
-        setError('An error occurred during registration. Please try again.');
+        setFormError(err.response?.data || 'Failed to register. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -170,7 +151,7 @@ export default function AttendeeSignup() {
         alignItems: 'center',
         minHeight: '100vh',
         width: '100%',
-        background: 'linear-gradient(to bottom right,rgb(255, 255, 255),rgb(253, 254, 253))',
+        background: 'linear-gradient(to bottom right, rgb(255, 255, 255), rgb(253, 254, 253))',
         padding: 2
       }}
     >
@@ -190,19 +171,14 @@ export default function AttendeeSignup() {
           <Avatar sx={{ m: 1, bgcolor: 'primary.main', width: 56, height: 56 }}>
             <PersonAddIcon fontSize="large" />
           </Avatar>
+          
           <Typography component="h1" variant="h4" sx={{ mb: 2 }}>
             Attendee Sign Up
           </Typography>
           
-          {error && (
+          {formError && (
             <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          
-          {success && (
-            <Alert severity="success" sx={{ width: '100%', mb: 2 }}>
-              Registration successful! Redirecting you to dashboard...
+              {formError}
             </Alert>
           )}
           
@@ -211,53 +187,60 @@ export default function AttendeeSignup() {
               margin="normal"
               required
               fullWidth
-              id="attendeeName"
+              id="name"
               label="Full Name"
-              name="attendeeName"
+              name="name"
               autoComplete="name"
               autoFocus
-              value={formData.attendeeName}
+              value={formData.name}
               onChange={handleChange}
-              disabled={loading || success}
+              error={!!errors.name}
+              helperText={errors.name}
             />
+            
             <TextField
               margin="normal"
               required
               fullWidth
-              id="attendeeEmail"
+              id="email"
               label="Email Address"
-              name="attendeeEmail"
+              name="email"
               autoComplete="email"
-              value={formData.attendeeEmail}
+              value={formData.email}
               onChange={handleChange}
-              disabled={loading || success}
+              error={!!errors.email}
+              helperText={errors.email}
             />
+            
             <TextField
               margin="normal"
               required
               fullWidth
-              id="attendeePhoneNumber"
+              id="phone"
               label="Phone Number"
-              name="attendeePhoneNumber"
+              name="phone"
               autoComplete="tel"
-              value={formData.attendeePhoneNumber}
+              value={formData.phone}
               onChange={handleChange}
-              disabled={loading || success}
+              error={!!errors.phone}
+              helperText={errors.phone}
             />
+            
             <TextField
               margin="normal"
               required
               fullWidth
-              name="attendeePassword"
+              name="password"
               label="Password"
               type="password"
-              id="attendeePassword"
+              id="password"
               autoComplete="new-password"
-              value={formData.attendeePassword}
+              value={formData.password}
               onChange={handleChange}
-              disabled={loading || success}
-              helperText="Minimum 6 characters"
+              error={!!errors.password}
+              helperText={errors.password}
             />
+            
             <TextField
               margin="normal"
               required
@@ -269,7 +252,8 @@ export default function AttendeeSignup() {
               autoComplete="new-password"
               value={formData.confirmPassword}
               onChange={handleChange}
-              disabled={loading || success}
+              error={!!errors.confirmPassword}
+              helperText={errors.confirmPassword}
             />
             
             <Button
@@ -278,12 +262,12 @@ export default function AttendeeSignup() {
               variant="contained"
               color="primary"
               sx={{ mt: 3, mb: 2, py: 1.5 }}
-              disabled={loading || success}
+              disabled={loading}
             >
               {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign Up'}
             </Button>
             
-            <Grid container justifyContent="space-between" spacing={1}>
+            <Grid container justifyContent="center">
               <Grid item>
                 <Button 
                   onClick={() => navigate('/attendee/login')}
@@ -297,6 +281,13 @@ export default function AttendeeSignup() {
           </Box>
         </Paper>
       </Container>
+      
+      <Snackbar
+        open={success}
+        autoHideDuration={2000}
+        onClose={() => setSuccess(false)}
+        message="Account created successfully!"
+      />
     </Box>
   );
 } 

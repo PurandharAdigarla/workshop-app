@@ -4,6 +4,8 @@ import com.aptr.workshop_backend.dto.*;
 import com.aptr.workshop_backend.entity.Workshop;
 import com.aptr.workshop_backend.service.WorkshopService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +15,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/workshop")
+@Slf4j
 public class WorkshopController {
     private final WorkshopService workshopService;
 
@@ -38,13 +41,9 @@ public class WorkshopController {
 
     @PostMapping("/register")
     public ResponseEntity<String> registerAttendee(@RequestBody WorkshopRegistrationRequestDto dto) {
-    String response = workshopService.registerAttendeeToWorkshop(dto);
-    if (response.equals("Registration successful")) {
-        return ResponseEntity.ok(response);
+        String response = workshopService.registerAttendeeToWorkshop(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
-    return ResponseEntity.badRequest().body(response);
-    }
-
 
     @DeleteMapping("/deregister")
     public ResponseEntity<String> deregisterAttendee(@RequestBody WorkshopRegistrationRequestDto dto) {
@@ -111,6 +110,33 @@ public class WorkshopController {
         List<AttendeeResponseDto> registrations = workshopService.getRegistrationsByWorkshopId(workshopId);
         ResponseDto<List<AttendeeResponseDto>> response = new ResponseDto<>(registrations.size(), registrations);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/feedback")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getAllWorkshopFeedbacks() {
+        try {
+            List<WorkshopFeedbackDto> feedbacks = workshopService.getAllWorkshopFeedbacks();
+            return ResponseEntity.ok(feedbacks);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error retrieving feedbacks: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/feedback/{workshopId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getWorkshopFeedback(@PathVariable Long workshopId) {
+        try {
+            WorkshopFeedbackDto feedback = workshopService.getWorkshopFeedback(workshopId);
+            if (feedback == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(feedback);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error retrieving workshop feedback: " + e.getMessage());
+        }
     }
 }
 

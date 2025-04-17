@@ -29,7 +29,7 @@ public class UnifiedUserDetailsService implements UserDetailsService {
             return User.builder()
                     .username(admin.getAdminUserId())
                     .password(admin.getAdminPassword())
-                    .roles(admin.getRole().name()) // Assuming you store role as enum
+                    .roles(admin.getRole().name())
                     .build();
         }
 
@@ -38,7 +38,7 @@ public class UnifiedUserDetailsService implements UserDetailsService {
             Attendee attendee = attendeeOpt.get();
             return User.builder()
                     .username(attendee.getAttendeeEmail())
-                    .password("") // OTP login, so no password stored
+                    .password("")
                     .roles(attendee.getRole().name())
                     .build();
         }

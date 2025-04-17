@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import {
   AppBar,
@@ -12,20 +12,29 @@ import {
   Paper,
   Button,
   Divider,
+  Container,
+  Alert,
+  Snackbar,
+  useTheme,
+  Chip,
 } from "@mui/material";
 import LogoutIcon from '@mui/icons-material/Logout';
 import { DataGrid } from "@mui/x-data-grid";
-import AccountCircle from "@mui/icons-material/AccountCircle";
+import HowToRegIcon from '@mui/icons-material/HowToReg';
+import EventNoteIcon from '@mui/icons-material/EventNote';
+import DoNotDisturbIcon from '@mui/icons-material/DoNotDisturb';
 import WorkshopDetailsDialog from "./WorkshopDetailsDialog";
 import RegisterForWorkshop from "./RegisterForWorkshop";
 import DeRegisterDialog from "./DeRegisterDialog";
-import FeedbackDialog from "./FeedbackDialog"; // 💡 Import
+import FeedbackDialog from "./FeedbackDialog";
 import AttendedComponent from "./AttendedComponent";
 
 const tabLabels = ["ongoing", "upcoming", "completed", "registered"];
 
 export default function AttendeeDashboard() {
+  const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("ongoing");
   const [tabIndex, setTabIndex] = useState(0);
   const [workshops, setWorkshops] = useState([]);
@@ -34,9 +43,12 @@ export default function AttendeeDashboard() {
   const [selectedWorkshop, setSelectedWorkshop] = useState(null);
   const [deRegisterDialogOpen, setDeRegisterDialogOpen] = useState(false);
   const [workshopToDeregister, setWorkshopToDeregister] = useState(null);
-
   const [pendingFeedbacks, setPendingFeedbacks] = useState([]);
   const [feedbackIndex, setFeedbackIndex] = useState(0);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  
+  const attendedComponentRef = useRef(null);
 
   const token = localStorage.getItem("accessToken");
   const attendeeId = localStorage.getItem("attendeeId");
@@ -124,13 +136,40 @@ export default function AttendeeDashboard() {
   };
 
   const handleRegister = async (workshopId) => {
-    const res = await RegisterForWorkshop(workshopId);
-    if (res.success) {
-      await fetchWorkshops(activeTab);
-    } else {
-      alert(res.error?.response?.data || "Registration failed");
+    try {
+      const res = await RegisterForWorkshop(workshopId);
+      if (res.success) {
+        await fetchWorkshops(activeTab);
+        setSuccessMessage("Successfully registered for the workshop!");
+        setSnackbarOpen(true);
+      } else {
+        setSuccessMessage(res.error?.response?.data || "Registration failed");
+        setSnackbarOpen(true);
+      }
+    } catch (error) {
+      setSuccessMessage("An error occurred during registration");
+      setSnackbarOpen(true);
     }
   };
+
+  useEffect(() => {
+    if (!token || !attendeeId) {
+      navigate("/attendee/login");
+      return;
+    }
+    
+    // Prevent navigation back to login page
+    window.history.pushState(null, "", location.pathname);
+    const preventNavigation = (e) => {
+      window.history.pushState(null, "", location.pathname);
+    };
+    
+    window.addEventListener("popstate", preventNavigation);
+    
+    return () => {
+      window.removeEventListener("popstate", preventNavigation);
+    };
+  }, [navigate, location.pathname, token, attendeeId]);
 
   useEffect(() => {
     fetchWorkshops(activeTab);
@@ -158,14 +197,19 @@ export default function AttendeeDashboard() {
       await fetchWorkshops(activeTab);
     }
     
-    alert("Successfully deregistered from the workshop");
+    setSuccessMessage("Successfully deregistered from the workshop");
+    setSnackbarOpen(true);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
   };
 
   const columns = [
     {
       field: "workshopTitle",
       headerName: "Title",
-      width: 400,
+      width: 350,
       renderCell: (params) => (
         <Button
           variant="text"
@@ -173,111 +217,206 @@ export default function AttendeeDashboard() {
             setSelectedWorkshop(params.row);
             setDetailsDialogOpen(true);
           }}
+          sx={{ 
+            justifyContent: 'flex-start', 
+            textAlign: 'left',
+            width: '100%',
+          }}
         >
           {params.value}
         </Button>
       ),
     },
-    { field: "workshopTopic", headerName: "Topic", width: 350 },
-    { field: "workshopTutors", headerName: "Tutors", width: 350 },
-    { field: "startDate", headerName: "Start", width: 200 },
-    { field: "endDate", headerName: "End", width: 200 },
+    { 
+      field: "workshopTopic", 
+      headerName: "Topic", 
+      width: 300,
+    },
+    { 
+      field: "workshopTutors", 
+      headerName: "Tutors", 
+      width: 200,
+      headerAlign: 'center',
+      align: 'center',
+    },
+    { 
+      field: "startDate", 
+      headerName: "Start Date", 
+      width: 180,
+      align: 'center',
+      headerAlign: 'center',
+    },
+    { 
+      field: "endDate", 
+      headerName: "End Date", 
+      width: 180,
+      align: 'center',
+      headerAlign: 'center',
+    },
     {
       field: "actions",
       headerName: "Actions",
-      width: 200,
+      width: 230,
       sortable: false,
+      align: 'center',
+      headerAlign: 'center',
       renderCell: (params) => {
         const isRegistered = registeredIds.includes(params.row.workshopId);
 
-        if (activeTab === "completed") {
-          return (
-            <Button variant="contained" disabled>
-              CLOSED
-            </Button>
-          );
-        }
-
-        if (activeTab === "registered") {
-          return (
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={() => handleDeregisterClick(params.row)}
-            >
-              De-register
-            </Button>
-          );
-        }
-
         return (
-          <Button
-            variant="outlined"
-            color={isRegistered ? "inherit" : "primary"}
-            disabled={isRegistered}
-            onClick={() => handleRegister(params.row.workshopId)}
-          >
-            {isRegistered ? "Registered" : "Register"}
-          </Button>
+          <Box sx={{ 
+            display: "flex", 
+            justifyContent: 'center', 
+            width: '100%', 
+            pt: 1
+          }}>
+            {activeTab === "completed" && (
+              <Chip 
+                label="Closed" 
+                color="default" 
+                size="small"
+                icon={<DoNotDisturbIcon />}
+              />
+            )}
+
+            {activeTab === "registered" && (
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                onClick={() => handleDeregisterClick(params.row)}
+                startIcon={<DoNotDisturbIcon />}
+                sx={{ borderRadius: 1 }}
+              >
+                Deregister
+              </Button>
+            )}
+
+            {activeTab !== "completed" && activeTab !== "registered" && isRegistered && (
+              <Chip 
+                label="Registered" 
+                color="success" 
+                size="small"
+                icon={<HowToRegIcon />}
+              />
+            )}
+
+            {activeTab !== "completed" && activeTab !== "registered" && !isRegistered && (
+              <Button
+                variant="outlined"
+                color="primary"
+                size="small"
+                onClick={() => handleRegister(params.row.workshopId)}
+                startIcon={<EventNoteIcon />}
+                sx={{ borderRadius: 1 }}
+              >
+                Register
+              </Button>
+            )}
+          </Box>
         );
       },
     },
   ];
 
+  // Handler for when feedback is submitted
+  const handleFeedbackSubmitted = () => {
+    const next = feedbackIndex + 1;
+    if (next < pendingFeedbacks.length) {
+      setFeedbackIndex(next);
+    } else {
+      setPendingFeedbacks([]);
+      fetchWorkshops(activeTab);
+      
+      // Refresh the attended workshops component
+      if (attendedComponentRef.current) {
+        attendedComponentRef.current.refreshAttendedWorkshops();
+      }
+    }
+  };
+
   return (
-    <Box sx={{ width: "100vw", minHeight: "100vh", bgcolor: "#f9f9f9", overflow: "auto", pb: 4 }}>
-      <AppBar position="static" sx={{ px: 2 }}>
+    <Box sx={{ 
+      minHeight: "100vh",
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <AppBar position="static">
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
           <Typography variant="h6">Attendee Dashboard</Typography>
-          <IconButton color="inherit" onClick={handleLogout}>
+          <IconButton color="inherit" onClick={handleLogout} size="large">
             <LogoutIcon />
           </IconButton>
         </Toolbar>
       </AppBar>
 
-      <Tabs
-        value={tabIndex}
-        onChange={handleTabChange}
-        indicatorColor="secondary"
-        textColor="primary"
-        variant="fullWidth"
-        disabled={pendingFeedbacks.length > 0}
-      >
-        {tabLabels.map((label, i) => (
-          <Tab key={i} label={label.toUpperCase()} />
-        ))}
-      </Tabs>
+      <Box sx={{ bgcolor: theme.palette.background.paper }}>
+        <Container maxWidth="xl">
+          <Tabs
+            value={tabIndex}
+            onChange={handleTabChange}
+            indicatorColor="primary"
+            textColor="primary"
+            variant="fullWidth"
+            disabled={pendingFeedbacks.length > 0}
+            sx={{ mt: 1 }}
+          >
+            {tabLabels.map((label, i) => (
+              <Tab 
+                key={i} 
+                label={label.charAt(0).toUpperCase() + label.slice(1)} 
+              />
+            ))}
+          </Tabs>
+        </Container>
+      </Box>
 
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h5" color="primary" gutterBottom sx={{ mb: 2 }}>
+      <Container maxWidth="xl" sx={{ flex: 1, mt: 4, mb: 6 }}>
+        <Typography 
+          variant="h5" 
+          color="primary" 
+          gutterBottom 
+          sx={{ mb: 3, pl: 1}}
+        >
           {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Workshops
         </Typography>
-        <Paper elevation={0} sx={{ width: "100%" }}>
+        
+        <Paper 
+          elevation={1} 
+          sx={{ 
+            width: "100%", 
+            borderRadius: 2,
+            overflow: 'hidden',
+            mb: 4
+          }}
+        >
           <DataGrid
             rows={workshops}
             columns={columns}
-            pageSizeOptions={[5]}
+            autoHeight
+            disableRowSelectionOnClick
+            pageSizeOptions={[5, 10]}
             initialState={{
               pagination: { paginationModel: { pageSize: 5, page: 0 } },
             }}
-            sx={{ 
-              minHeight: 350,
-              '& .MuiDataGrid-columnHeaders': {
-                backgroundColor: '#f5f5f5',
-              }
-            }}
+            // sx={{ minHeight: 350 }}
           />
         </Paper>
-      </Box>
       
-      {/* Attended Workshops Section */}
-      <Box sx={{ px: 3, pt: 0 }}>
-        <Divider sx={{ my: 3 }} />
-        <Typography variant="h5" color="primary" gutterBottom sx={{ mb: 2 }}>
-          Attended Workshops
-        </Typography>
-        <AttendedComponent />
-      </Box>
+        {/* Attended Workshops Section */}
+        <Box sx={{ mt: 6 }}>
+          <Divider sx={{ mb: 4 }} />
+          <Typography 
+            variant="h5" 
+            color="primary" 
+            gutterBottom 
+            sx={{ mb: 3, pl: 1}}
+          >
+            Attended Workshops
+          </Typography>
+          <AttendedComponent ref={attendedComponentRef} />
+        </Box>
+      </Container>
 
       <WorkshopDetailsDialog
         open={detailsDialogOpen}
@@ -298,17 +437,25 @@ export default function AttendeeDashboard() {
           open={true}
           workshop={pendingFeedbacks[feedbackIndex]}
           attendeeId={attendeeId}
-          onSubmitted={() => {
-            const next = feedbackIndex + 1;
-            if (next < pendingFeedbacks.length) {
-              setFeedbackIndex(next);
-            } else {
-              setPendingFeedbacks([]);
-              fetchWorkshops(activeTab);
-            }
-          }}
+          onSubmitted={handleFeedbackSubmitted}
         />
       )}
+
+      <Snackbar 
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity="success" 
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

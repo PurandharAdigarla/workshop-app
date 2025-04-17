@@ -1,15 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, forwardRef, useImperativeHandle } from "react";
 import axios from "axios";
 import { DataGrid } from '@mui/x-data-grid';
 import Paper from '@mui/material/Paper';
+import { CircularProgress, Typography, Box } from '@mui/material';
 
-export default function AttendedComponent() {
+const AttendedComponent = forwardRef((props, ref) => {
   const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
 
   const token = localStorage.getItem("accessToken");
   const attendeeId = localStorage.getItem("attendeeId");
+
+  // Expose the fetchAttendedWorkshops method to parent components
+  useImperativeHandle(ref, () => ({
+    refreshAttendedWorkshops: fetchAttendedWorkshops
+  }));
 
   useEffect(() => {
     fetchAttendedWorkshops();
@@ -22,6 +30,8 @@ export default function AttendedComponent() {
       return;
     }
 
+    setLoading(true);
+    
     try {
       const response = await axios.get(
         `http://localhost:8080/workshop/attended/${attendeeId}`,
@@ -48,76 +58,84 @@ export default function AttendedComponent() {
     }
   };
 
+  const handlePaginationModelChange = (model) => {
+    setPage(model.page);
+    setPageSize(model.pageSize);
+  };
+
   const columns = [
     { 
       field: 'workshopTitle', 
       headerName: 'Title', 
-      width: 200,
+      width: 250,
       flex: 1
     },
     { 
       field: 'workshopTopic', 
       headerName: 'Topic', 
-      width: 150,
-      flex: 1
+      width: 200,
     },
     { 
       field: 'workshopTutors', 
       headerName: 'Tutors', 
-      width: 350,
-      flex: 1
+      width: 250,
+      headerAlign: 'center',
+      align: 'center',
     },
     { 
       field: 'startDate', 
       headerName: 'Start Date', 
       width: 200,
-      flex: 1
+      headerAlign: 'center',
+      align: 'center',
     },
     { 
       field: 'endDate', 
       headerName: 'End Date', 
       width: 200,
-      flex: 1
+      headerAlign: 'center',
+      align: 'center',
     }
   ];
 
   if (loading) {
     return (
-      <Paper sx={{ height: 400, width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <div>Loading...</div>
+      <Paper sx={{ width: '100%', p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: 2 }} elevation={1}>
+        <CircularProgress size={40} />
       </Paper>
     );
   }
 
   if (error) {
     return (
-      <Paper sx={{ height: 400, width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <div>{error}</div>
+      <Paper sx={{ width: '100%', p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: 2 }} elevation={1}>
+        <Typography color="error">{error}</Typography>
       </Paper>
     );
   }
 
   if (workshops.length === 0) {
     return (
-      <Paper sx={{ height: 400, width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <div>You haven't attended any workshops yet.</div>
+      <Paper sx={{ width: '100%', p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: 2 }} elevation={1}>
+        <Typography>You haven't attended any workshops yet.</Typography>
       </Paper>
     );
   }
 
   return (
-    <Paper sx={{ height: 400, width: '100%' }}>
+    <Paper sx={{ width: '100%', borderRadius: 2, overflow: 'hidden' }} elevation={1}>
       <DataGrid
         rows={workshops}
         columns={columns}
-        initialState={{
-          pagination: { paginationModel: { pageSize: 5 } }
-        }}
-        pageSizeOptions={[5]}
-        sx={{ border: 0 }}
+        pageSizeOptions={[5, 10]}
+        paginationModel={{ page, pageSize }}
+        onPaginationModelChange={handlePaginationModelChange}
+        autoHeight
         disableRowSelectionOnClick
       />
     </Paper>
   );
-}
+});
+
+export default AttendedComponent;
 

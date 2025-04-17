@@ -1,9 +1,9 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import AdminLogin from "./components/pages/admin/AdminLogin";
-import AdminDashboard from "./components/pages/admin/AdminDashboard";
-import AttendeeLogin from "./components/pages/attendee/AttendeeLogin";
-import AttendeeDashboard from "./components/pages/attendee/AttendeeDashboard";
-import AttendeeSignup from "./components/pages/attendee/AttendeeSignup";
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import AdminLogin from './components/pages/admin/AdminLogin';
+import AdminDashboard from './components/pages/admin/AdminDashboard';
+import AttendeeLogin from './components/pages/attendee/AttendeeLogin';
+import AttendeeDashboard from './components/pages/attendee/AttendeeDashboard';
+import AttendeeSignup from './components/pages/attendee/AttendeeSignup';
 
 function App() {
   return (

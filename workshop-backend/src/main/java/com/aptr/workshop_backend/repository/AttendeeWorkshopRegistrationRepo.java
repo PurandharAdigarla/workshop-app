@@ -31,5 +31,18 @@ public interface AttendeeWorkshopRegistrationRepo extends JpaRepository<Attendee
 
     @Query("SELECT r FROM AttendeeWorkshopRegistration r WHERE r.attendee.attendeeId = :attendeeId AND r.attended = true")
     List<AttendeeWorkshopRegistration> findAttendedWorkshopsByAttendeeId(@Param("attendeeId") Long attendeeId);
+    
+    @Query("SELECT r FROM AttendeeWorkshopRegistration r " +
+           "WHERE r.feedbackGiven = true " +
+           "AND r.workshop.workshopId = :workshopId")
+    List<AttendeeWorkshopRegistration> findFeedbacksByWorkshopId(@Param("workshopId") Long workshopId);
+    
+    @Query("SELECT DISTINCT r.workshop.workshopId FROM AttendeeWorkshopRegistration r " +
+           "WHERE r.feedbackGiven = true")
+    List<Long> findWorkshopIdsWithFeedback();
+    
+    @Query("SELECT AVG(r.rating) FROM AttendeeWorkshopRegistration r " +
+           "WHERE r.workshop.workshopId = :workshopId AND r.feedbackGiven = true")
+    Double getAverageRatingForWorkshop(@Param("workshopId") Long workshopId);
 }
 
