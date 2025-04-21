@@ -4,8 +4,6 @@ import com.aptr.workshop_backend.dto.AttendeeAccessTokenDto;
 import com.aptr.workshop_backend.dto.AttendeeDto;
 import com.aptr.workshop_backend.dto.AttendeeLoginDto;
 import com.aptr.workshop_backend.dto.AttendeeRegisterDto;
-import com.aptr.workshop_backend.exception.ConflictException;
-import com.aptr.workshop_backend.exception.UnauthorizedException;
 import com.aptr.workshop_backend.service.AttendeeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +27,7 @@ public class AttendeeController {
     @PreAuthorize("permitAll()")
     public ResponseEntity<String> signup(@RequestBody AttendeeRegisterDto dto) {
         String result = attendeeService.signup(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/login")

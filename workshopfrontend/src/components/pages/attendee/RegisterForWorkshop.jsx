@@ -1,25 +1,23 @@
-import axios from "axios";
+import { workshopApi } from "../../../utils/api";
 
 export const RegisterForWorkshop = async (workshopId) => {
-  const token = localStorage.getItem("accessToken");
   const attendeeId = parseInt(localStorage.getItem("attendeeId"));
 
-  if (!token || !attendeeId) {
-    console.error("Missing token or attendee ID");
-    return { success: false, error: "Missing token or attendee ID" };
+  if (!attendeeId) {
+    console.error("Missing attendee ID");
+    return { success: false, error: "Missing attendee ID" };
   }
 
   try {
-    const res = await axios.post(
-      "http://localhost:8080/workshop/register",
-      { attendeeId, workshopId },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    return { success: true, data: res.data };
+    const response = await workshopApi.registerForWorkshop(workshopId, attendeeId);
+    return { success: true, data: response.data };
   } catch (err) {
     console.error("Registration failed:", err);
-    return { success: false, error: err };
+    return { 
+      success: false, 
+      error: err,
+      message: err.userMessage || "Failed to register for workshop" 
+    };
   }
 };
 

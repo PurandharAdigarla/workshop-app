@@ -4,11 +4,11 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Snackbar,
-  Alert,
 } from "@mui/material";
-import axios from "axios";
 import { useState } from "react";
+import { workshopApi } from "../../../utils/api";
+import Alert from "../../common/Alert";
+import LoadingButton from "../../common/LoadingButton";
 
 export default function DeleteWorkshopDialog({
   open,
@@ -18,16 +18,12 @@ export default function DeleteWorkshopDialog({
 }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [alertOpen, setAlertOpen] = useState(false);
 
   const handleDelete = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("accessToken");
-      await axios.delete(`http://localhost:8080/workshop/${workshopId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await workshopApi.deleteWorkshop(workshopId);
       setLoading(false);
       if (typeof onDeleteSuccess === 'function') {
         onDeleteSuccess();
@@ -36,7 +32,8 @@ export default function DeleteWorkshopDialog({
     } catch (err) {
       console.error("Error deleting workshop:", err);
       setLoading(false);
-      setErrorMsg("Failed to delete workshop.");
+      setErrorMsg(err.userMessage || "Failed to delete workshop.");
+      setAlertOpen(true);
     }
   };
 
@@ -51,25 +48,23 @@ export default function DeleteWorkshopDialog({
           <Button onClick={onClose} disabled={loading}>
             Cancel
           </Button>
-          <Button
+          <LoadingButton
             color="error"
             onClick={handleDelete}
-            disabled={loading}
+            loading={loading}
+            variant="contained"
           >
             Delete
-          </Button>
+          </LoadingButton>
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={!!errorMsg}
-        autoHideDuration={3000}
-        onClose={() => setErrorMsg("")}
-      >
-        <Alert onClose={() => setErrorMsg("")} severity="error" sx={{ width: "100%" }}>
-          {errorMsg}
-        </Alert>
-      </Snackbar>
+      <Alert
+        open={alertOpen}
+        message={errorMsg}
+        severity="error"
+        onClose={() => setAlertOpen(false)}
+      />
     </>
   );
 }

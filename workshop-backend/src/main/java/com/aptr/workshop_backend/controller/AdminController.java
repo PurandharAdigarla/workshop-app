@@ -1,15 +1,11 @@
 package com.aptr.workshop_backend.controller;
 
 import com.aptr.workshop_backend.dto.*;
-import com.aptr.workshop_backend.entity.Admin;
-import com.aptr.workshop_backend.entity.Attendee;
-import com.aptr.workshop_backend.entity.AttendeeWorkshopRegistration;
 import com.aptr.workshop_backend.service.AdminService;
 import com.aptr.workshop_backend.service.WorkshopStateUpdater;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,13 +25,20 @@ public class AdminController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AccessTokenDto> adminLogin(@RequestBody AdminLoginDto adminLoginDto) {
-        AccessTokenDto accessTokenDto = adminService.adminLogin(adminLoginDto);
-        if (accessTokenDto == null) {
-            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+    public ResponseEntity<?> adminLogin(@RequestBody AdminLoginDto adminLoginDto) {
+        try {
+            AccessTokenDto accessTokenDto = adminService.adminLogin(adminLoginDto);
+            if (accessTokenDto == null) {
+                return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body("Invalid username or password");
+            }
+            return ResponseEntity.ok(accessTokenDto);
+        } catch (Exception e) {
+            return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("An error occurred during login: " + e.getMessage());
         }
-
-        return ResponseEntity.ok(accessTokenDto);
     }
 
     @GetMapping()

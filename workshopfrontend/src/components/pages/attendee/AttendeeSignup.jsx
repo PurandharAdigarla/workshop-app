@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { workshopApi } from '../../../utils/api';
 import {
   Avatar,
   Button,
@@ -31,31 +31,35 @@ export default function AttendeeSignup() {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
+  /**
+   * Validates form fields, trimming whitespace for text inputs
+   * @returns {boolean} Whether the form is valid
+   */
   const validateForm = () => {
     const newErrors = {};
     
-    // Name validation
+    // Name validation - trim to prevent whitespace-only inputs
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required';
     } else if (formData.name.trim().length < 2) {
       newErrors.name = 'Name must be at least 2 characters';
     }
     
-    // Email validation
+    // Email validation - trim to prevent whitespace-only inputs
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    } else if (!/\S+@\S+\.\S+/.test(formData.email.trim())) {
       newErrors.email = 'Email address is invalid';
     }
     
-    // Phone validation
+    // Phone validation - trim to prevent whitespace-only inputs and ensure exactly 10 digits
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
-    } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
-      newErrors.phone = 'Phone number must be 10 digits';
+    } else if (formData.phone.length !== 10) {
+      newErrors.phone = 'Phone number must be exactly 10 digits';
     }
     
-    // Password validation
+    // Password validation - no trimming for security fields
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
@@ -73,10 +77,20 @@ export default function AttendeeSignup() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
+    
+    // For phone field, only allow digits
+    if (name === 'phone') {
+      const digitsOnly = value.replace(/\D/g, '');
+      setFormData({
+        ...formData,
+        [name]: digitsOnly
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
     
     // Clear specific field error when typing
     if (errors[name]) {
@@ -87,6 +101,7 @@ export default function AttendeeSignup() {
     }
   };
 
+  // Handle form submission - trims all text input values before sending to backend
   const handleSubmit = async (event) => {
     event.preventDefault();
     
@@ -98,20 +113,23 @@ export default function AttendeeSignup() {
     setFormError('');
 
     try {
-      // Submit signup data
-      const response = await axios.post('http://localhost:8080/attendees/signup', {
-        attendeeName: formData.name,
-        attendeeEmail: formData.email,
-        attendeePhone: formData.phone,
-        attendeePassword: formData.password
-      });
+      // Trim all input values before submission
+      const trimmedData = {
+        attendeeName: formData.name.trim(),
+        attendeeEmail: formData.email.trim(),
+        attendeePhoneNumber: formData.phone.trim(),
+        attendeePassword: formData.password // Don't trim password - spaces could be intentional
+      };
+      
+      // Submit signup data with trimmed values
+      const response = await workshopApi.signupAttendee(trimmedData);
       
       setSuccess(true);
       
-      // Auto login after successful signup
+      // Auto login after successful signup - use trimmed values
       try {
-        const loginResponse = await axios.post('http://localhost:8080/attendees/login', {
-          attendeeEmail: formData.email,
+        const loginResponse = await workshopApi.loginAttendee({
+          attendeeEmail: trimmedData.attendeeEmail,
           attendeePassword: formData.password
         });
         
@@ -136,7 +154,7 @@ export default function AttendeeSignup() {
       if (err.response?.status === 409) {
         setFormError('Email or phone number already in use');
       } else {
-        setFormError(err.response?.data || 'Failed to register. Please try again.');
+        setFormError(err.userMessage || err.response?.data || 'Failed to register. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -223,7 +241,10 @@ export default function AttendeeSignup() {
               value={formData.phone}
               onChange={handleChange}
               error={!!errors.phone}
-              helperText={errors.phone}
+              inputProps={{ 
+                maxLength: 10,
+                inputMode: 'numeric' 
+              }}
             />
             
             <TextField

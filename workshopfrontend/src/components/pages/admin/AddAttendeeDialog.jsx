@@ -20,7 +20,7 @@ import {
   ListItemText,
   Divider
 } from '@mui/material';
-import axios from 'axios';
+import { workshopApi } from "../../../utils/api";
 
 function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
   const [tabIndex, setTabIndex] = useState(0);
@@ -40,6 +40,7 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
   const [filteredAttendees, setFilteredAttendees] = useState([]);
   const [selectedExistingAttendee, setSelectedExistingAttendee] = useState(null);
   const [existingAttendeeError, setExistingAttendeeError] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     if (open && tabIndex === 1) {
@@ -63,29 +64,22 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
   }, [searchQuery, allAttendees]);
 
   const fetchAllAttendees = async () => {
-    setFetchingAttendees(true);
-    setError('');
+    if (!open || tabIndex !== 1) return;
     
     try {
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get(
-        'http://localhost:8080/attendees',
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+      setSearchLoading(true);
+      const response = await workshopApi.getAllAttendees();
+      
+      // Sort alphabetically by name
+      const sortedAttendees = [...response.data].sort((a, b) => 
+        a.attendeeName.localeCompare(b.attendeeName)
       );
       
-      if (response.data) {
-        setAllAttendees(response.data);
-        setFilteredAttendees(response.data);
-      }
+      setAllAttendees(sortedAttendees);
     } catch (err) {
-      console.error('Error fetching attendees:', err);
-      setError('Failed to fetch attendees. Please try again.');
+      console.error("Error fetching attendees:", err);
     } finally {
-      setFetchingAttendees(false);
+      setSearchLoading(false);
     }
   };
 
@@ -140,14 +134,9 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
     setError('');
     
     try {
-      const token = localStorage.getItem('accessToken');
-      
       // Try to create the attendee account
       try {
-        const signupResponse = await axios.post(
-          'http://localhost:8080/attendees/signup',
-          formData
-        );
+        const signupResponse = await workshopApi.signupAttendee(formData);
         
         console.log("Signup successful:", signupResponse.data);
       } catch (signupErr) {
@@ -163,19 +152,16 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
       
       // Attempt to login with the credentials to get the attendee ID
       try {
-        const loginResponse = await axios.post(
-          'http://localhost:8080/attendees/login',
-          {
-            attendeeEmail: formData.attendeeEmail,
-            attendeePassword: formData.attendeePassword
-          }
-        );
+        const loginResponse = await workshopApi.loginAttendee({
+          attendeeEmail: formData.attendeeEmail,
+          attendeePassword: formData.attendeePassword
+        });
         
         if (loginResponse.data && loginResponse.data.attendeeId) {
           console.log("Login successful, got attendee ID:", loginResponse.data.attendeeId);
           
           // Register the attendee to the workshop
-          await registerAttendeeToWorkshop(loginResponse.data.attendeeId, token);
+          await registerAttendeeToWorkshop(loginResponse.data.attendeeId);
           
           handleSuccess();
           return; 
@@ -187,14 +173,7 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
       // If login fails or attendeeId is missing, try to find the attendee by email
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const attendeesResponse = await axios.get(
-        'http://localhost:8080/attendees',
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
+      const attendeesResponse = await workshopApi.getAllAttendees();
       
       const attendeeEmail = formData.attendeeEmail.toLowerCase().trim();
       const attendee = attendeesResponse.data.find(a => 
@@ -210,12 +189,12 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
       }
       
       // Register the attendee to the workshop
-      await registerAttendeeToWorkshop(attendee.attendeeId, token);
+      await registerAttendeeToWorkshop(attendee.attendeeId);
       
       handleSuccess();
     } catch (err) {
       console.error('Error adding attendee:', err);
-      setError(typeof err.message === 'string' ? err.message : 'Failed to add attendee. Please try again.');
+      setError(err.userMessage || (typeof err.message === 'string' ? err.message : 'Failed to add attendee. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -252,9 +231,7 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
     setExistingAttendeeError('');
     
     try {
-      const token = localStorage.getItem('accessToken');
-      
-      await registerAttendeeToWorkshop(selectedExistingAttendee.attendeeId, token);
+      await registerAttendeeToWorkshop(selectedExistingAttendee.attendeeId);
       
       setSuccess(true);
       setSelectedExistingAttendee(null);
@@ -293,21 +270,9 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
     }
   };
 
-  const registerAttendeeToWorkshop = async (attendeeId, token) => {
+  const registerAttendeeToWorkshop = async (attendeeId) => {
     try {
-      const registrationResponse = await axios.post(
-        'http://localhost:8080/workshop/register',
-        {
-          attendeeId: attendeeId,
-          workshopId: workshopId
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const registrationResponse = await workshopApi.registerForWorkshop(workshopId, attendeeId);
       
       return registrationResponse;
     } catch (error) {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -14,222 +14,56 @@ import {
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import axios from "axios";
+import { workshopApi } from "../../../utils/api";
+import useWorkshopForm, { ERROR_MESSAGES } from "../../../hooks/useWorkshopForm";
 
-const EditWorkshopDialog = ({ open, onClose, workshop }) => {
-  const [form, setForm] = useState({
-    workshopTitle: "",
-    workshopTopic: "",
-    workshopObjective: "",
-    workshopDescription: "",
-    workshopInstructions: "",
-    workshopTutors: "",
-    startDate: new Date(),
-    endDate: new Date(),
-  });
-
+/**
+ * Dialog component for editing workshop details
+ * @param {Object} props - Component props
+ * @param {boolean} props.open - Whether the dialog is open
+ * @param {Function} props.onClose - Function to call when dialog is closed
+ * @param {Object} props.workshop - Workshop data to edit
+ * @param {Function} props.onSuccess - Function to call on successful edit
+ */
+const EditWorkshopDialog = ({ open, onClose, workshop, onSuccess }) => {
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [dateHelperText, setDateHelperText] = useState({
-    startDate: "",
-    endDate: "",
-  });
 
-  const getWorkshopState = () => {
-    if (!workshop) return { isOngoing: false, isUpcoming: false, isCompleted: false };
-    
-    const currentDate = new Date();
-    currentDate.setHours(0, 0, 0, 0);
-    
-    const startDate = new Date(workshop.startDate);
-    startDate.setHours(0, 0, 0, 0);
-    
-    const endDate = new Date(workshop.endDate);
-    endDate.setHours(0, 0, 0, 0);
-    
-    const isOngoing = (startDate <= currentDate) && (endDate >= currentDate);
-    const isUpcoming = startDate > currentDate;
-    const isCompleted = endDate < currentDate;
-    
-    console.log("Workshop state calculation:", {
-      startDate: startDate.toLocaleDateString(),
-      endDate: endDate.toLocaleDateString(),
-      currentDate: currentDate.toLocaleDateString(),
-      isOngoing,
-      isUpcoming,
-      isCompleted
-    });
-    
-    return { isOngoing, isUpcoming, isCompleted };
-  };
-  
-  const { isOngoing, isUpcoming, isCompleted } = getWorkshopState();
+  // Use our custom hook for form state and validation
+  const {
+    form,
+    error,
+    setError,
+    dateHelperText,
+    workshopState,
+    handleChange,
+    handleDateChange,
+    validateForm,
+    getFormData
+  } = useWorkshopForm(workshop);
 
-  useEffect(() => {
-    if (workshop) {
-      try {
-        const startDate = new Date(workshop.startDate);
-        const endDate = new Date(workshop.endDate);
-        
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-          console.error("Invalid date format in workshop data", { 
-            startDate: workshop.startDate, 
-            endDate: workshop.endDate 
-          });
-          setError("Workshop contains invalid date format");
-          return;
-        }
-        
-        setForm({
-          workshopTitle: workshop.workshopTitle || "",
-          workshopTopic: workshop.workshopTopic || "",
-          workshopObjective: workshop.workshopObjective || "",
-          workshopDescription: workshop.workshopDescription || "",
-          workshopInstructions: workshop.workshopInstructions || "",
-          workshopTutors: Array.isArray(workshop.workshopTutors) 
-            ? workshop.workshopTutors.join(", ") 
-            : workshop.workshopTutors || "",
-          startDate,
-          endDate,
-        });
-        setError("");
-        
-        if (isCompleted) {
-          setDateHelperText({
-            startDate: "Dates cannot be modified for completed workshops",
-            endDate: "Dates cannot be modified for completed workshops",
-          });
-        } else if (isOngoing) {
-          setDateHelperText({
-            startDate: "Start date cannot be modified for ongoing workshops",
-            endDate: "End date must be today or later for ongoing workshops",
-          });
-        } else if (isUpcoming) {
-          setDateHelperText({
-            startDate: "Start date must be today or later",
-            endDate: "End date must be today or later",
-          });
-        } else {
-          setDateHelperText({
-            startDate: "",
-            endDate: "",
-          });
-        }
-      } catch (err) {
-        console.error("Error setting up form data", err);
-        setError("Error loading workshop data");
-      }
-    }
-  }, [workshop, isOngoing, isUpcoming, isCompleted]);
+  const { isOngoing, isUpcoming, isCompleted } = workshopState;
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+  /**
+   * Gets a label describing the workshop's status
+   * @returns {string} The status label
+   */
+  const getStatusLabel = () => {
+    if (isCompleted) return "(Completed Workshop - Dates cannot be modified)";
+    if (isOngoing) return "(Ongoing Workshop - Start date cannot be modified)";
+    if (isUpcoming) return "(Upcoming Workshop)";
+    return "";
   };
 
-  const handleDateChange = (key, value) => {
-    if (isCompleted) {
-      return;
-    }
-    
-    if (key === "startDate" && isOngoing) {
-      return;
-    }
-    
-    if (value && !isNaN(new Date(value).getTime())) {
-      setForm((prev) => ({ ...prev, [key]: value }));
-    }
-  };
-
-  const formatDateForBackend = (date) => {
-    if (!date) return null;
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return null;
-    
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}`;
-  };
-
-  const validateDates = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const startDate = new Date(form.startDate);
-    startDate.setHours(0, 0, 0, 0);
-    
-    const endDate = new Date(form.endDate);
-    endDate.setHours(0, 0, 0, 0);
-    
-    console.log("Validating dates:", {
-      isOngoing,
-      isUpcoming,
-      isCompleted,
-      startDate: startDate.toLocaleDateString(),
-      endDate: endDate.toLocaleDateString(),
-      today: today.toLocaleDateString()
-    });
-    
-    if (isCompleted) {
-      const originalStartDate = new Date(workshop.startDate);
-      const originalEndDate = new Date(workshop.endDate);
-      
-      if (startDate.getTime() !== originalStartDate.getTime() ||
-          endDate.getTime() !== originalEndDate.getTime()) {
-        setError("Dates cannot be modified for completed workshops");
-        return false;
-      }
-    }
-    
-    if (endDate <= startDate) {
-      setError("End date must be after start date");
-      return false;
-    }
-    
-    if (isOngoing) {
-      const originalStartDate = new Date(workshop.startDate);
-      originalStartDate.setHours(0, 0, 0, 0);
-      
-      if (startDate.getTime() !== originalStartDate.getTime()) {
-        setError("Start date cannot be modified for ongoing workshops");
-        return false;
-      }
-      
-      if (endDate < today) {
-        setError("End date must be today or later for ongoing workshops");
-        return false;
-      }
-    }
-    
-    if (isUpcoming) {
-      if (startDate < today) {
-        setError("Start date must be today or later for upcoming workshops");
-        return false;
-      }
-      
-      if (endDate < today) {
-        setError("End date must be today or later for upcoming workshops");
-        return false;
-      }
-    }
-    
-    return true;
-  };
-
+  /**
+   * Handles form submission
+   */
   const handleSubmit = async () => {
     setLoading(true);
     setError("");
     
-    if (!form.workshopTitle || !form.workshopTopic) {
-      setError("Title and Topic are required");
-      setLoading(false);
-      return;
-    }
-    
-    if (!validateDates()) {
+    // Validate form
+    if (!validateForm()) {
       setLoading(false);
       return;
     }
@@ -238,64 +72,37 @@ const EditWorkshopDialog = ({ open, onClose, workshop }) => {
       const token = localStorage.getItem("accessToken");
       
       if (!token) {
-        setError("You are not authenticated. Please log in again.");
+        setError(ERROR_MESSAGES.NOT_AUTHENTICATED);
         setLoading(false);
         return;
       }
 
-      const formattedStartDate = formatDateForBackend(form.startDate);
-      const formattedEndDate = formatDateForBackend(form.endDate);
-      
-      console.log("Formatted dates:", { 
-        startDate: formattedStartDate, 
-        endDate: formattedEndDate,
-        originalStartDate: form.startDate.toLocaleDateString(),
-        originalEndDate: form.endDate.toLocaleDateString()
-      });
-
-      const payload = {
-        workshopId: workshop.workshopId,
-        workshopTitle: form.workshopTitle,
-        workshopTopic: form.workshopTopic,
-        workshopObjective: form.workshopObjective,
-        workshopDescription: form.workshopDescription,
-        workshopInstructions: form.workshopInstructions,
-        workshopTutors: form.workshopTutors
-          .split(",")
-          .map((tutor) => tutor.trim())
-          .filter(Boolean),
-        startDate: formattedStartDate,
-        endDate: formattedEndDate,
-      };
-
+      // Get form data ready for submission
+      // All form fields are trimmed to remove leading and trailing whitespace
+      const payload = getFormData();
       console.log("Sending payload:", payload);
 
-      const response = await axios.patch(
-        `http://localhost:8080/workshop/${workshop.workshopId}`,
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
+      // Submit form data
+      const response = await workshopApi.editWorkshop(workshop.workshopId, payload);
       console.log("Edit response:", response.data);
+      
+      // Show success message
       setShowSuccessAlert(true);
 
+      // Call success callback
+      if (typeof onSuccess === 'function') {
+        onSuccess("Workshop updated successfully");
+      }
+
+      // Close dialog after a delay
       setTimeout(() => {
         setShowSuccessAlert(false);
         onClose();
       }, 1500);
     } catch (err) {
       console.error("Error updating workshop:", err);
-      console.error("Error details:", {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status
-      });
       
+      // Handle different error types
       if (err.response?.status === 403) {
         setError("Access denied. You don't have permission to edit workshops. Please log in again with admin credentials.");
         localStorage.removeItem("accessToken"); 
@@ -303,19 +110,12 @@ const EditWorkshopDialog = ({ open, onClose, workshop }) => {
         setError("Your session has expired. Please log in again.");
         localStorage.removeItem("accessToken"); 
       } else {
-        const errorMessage = err?.response?.data || "Failed to update workshop";
+        const errorMessage = err.userMessage || err.response?.data || "Failed to update workshop";
         setError(errorMessage);
       }
     } finally {
       setLoading(false);
     }
-  };
-
-  const getStatusLabel = () => {
-    if (isCompleted) return "(Completed Workshop - Dates cannot be modified)";
-    if (isOngoing) return "(Ongoing Workshop - Start date cannot be modified)";
-    if (isUpcoming) return "(Upcoming Workshop)";
-    return "";
   };
 
   return (
@@ -401,6 +201,7 @@ const EditWorkshopDialog = ({ open, onClose, workshop }) => {
               name="workshopTutors"
               value={form.workshopTutors}
               onChange={handleChange}
+              required
             />
           </Grid>
 
@@ -416,9 +217,8 @@ const EditWorkshopDialog = ({ open, onClose, workshop }) => {
                   textField: { 
                     fullWidth: true,
                     helperText: dateHelperText.startDate,
-                    error: (isOngoing && form.startDate.getTime() !== new Date(workshop?.startDate).getTime()) || 
-                           (isCompleted && form.startDate.getTime() !== new Date(workshop?.startDate).getTime())
-                  } 
+                    error: Boolean(dateHelperText.startDate && (isOngoing || isCompleted))
+                  }
                 }}
               />
             </Grid>
@@ -433,8 +233,8 @@ const EditWorkshopDialog = ({ open, onClose, workshop }) => {
                   textField: { 
                     fullWidth: true,
                     helperText: dateHelperText.endDate,
-                    error: (isCompleted && form.endDate.getTime() !== new Date(workshop?.endDate).getTime())
-                  } 
+                    error: Boolean(dateHelperText.endDate && isCompleted)
+                  }
                 }}
               />
             </Grid>
@@ -447,9 +247,11 @@ const EditWorkshopDialog = ({ open, onClose, workshop }) => {
         <Button 
           onClick={handleSubmit} 
           variant="contained" 
-          disabled={loading}
+          color="primary" 
+          disabled={loading || isCompleted}
+          startIcon={loading ? <CircularProgress size={20} /> : null}
         >
-          {loading ? <CircularProgress size={24} /> : "Save Changes"}
+          {loading ? "Updating..." : "Update Workshop"}
         </Button>
       </DialogActions>
     </Dialog>

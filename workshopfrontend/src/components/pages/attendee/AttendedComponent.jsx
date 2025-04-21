@@ -1,18 +1,15 @@
 import { useEffect, useState, forwardRef, useImperativeHandle } from "react";
-import axios from "axios";
 import { DataGrid } from '@mui/x-data-grid';
 import Paper from '@mui/material/Paper';
 import { CircularProgress, Typography, Box } from '@mui/material';
+import { workshopApi } from "../../../utils/api";
 
-const AttendedComponent = forwardRef((props, ref) => {
+const AttendedComponent = forwardRef(({ attendeeId }, ref) => {
   const [workshops, setWorkshops] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
-
-  const token = localStorage.getItem("accessToken");
-  const attendeeId = localStorage.getItem("attendeeId");
 
   // Expose the fetchAttendedWorkshops method to parent components
   useImperativeHandle(ref, () => ({
@@ -21,11 +18,15 @@ const AttendedComponent = forwardRef((props, ref) => {
 
   useEffect(() => {
     fetchAttendedWorkshops();
-  }, []);
+  }, [attendeeId]);
 
   const fetchAttendedWorkshops = async () => {
-    if (!token || !attendeeId) {
-      setError("Authentication required");
+    const token = localStorage.getItem('accessToken');
+    const currentAttendeeId = attendeeId || localStorage.getItem('attendeeId');
+    
+    if (!token || !currentAttendeeId) {
+      console.error("No authentication token or attendee ID");
+      setError("Authentication error. Please login again.");
       setLoading(false);
       return;
     }
@@ -33,12 +34,7 @@ const AttendedComponent = forwardRef((props, ref) => {
     setLoading(true);
     
     try {
-      const response = await axios.get(
-        `http://localhost:8080/workshop/attended/${attendeeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await workshopApi.getAttendedWorkshops(currentAttendeeId);
       
       // Format the workshops data
       const formattedWorkshops = response.data.map((workshop, index) => ({
@@ -53,7 +49,7 @@ const AttendedComponent = forwardRef((props, ref) => {
       setLoading(false);
     } catch (err) {
       console.error("Error fetching attended workshops:", err);
-      setError("Failed to fetch attended workshops");
+      setError(err.userMessage || "Failed to fetch attended workshops");
       setLoading(false);
     }
   };

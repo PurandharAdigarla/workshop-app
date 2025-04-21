@@ -11,7 +11,7 @@ import {
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import axios from "axios";
+import { workshopApi } from "../../../utils/api";
 
 function AddWorkshopDialog({ open, onClose }) {
   const initialFormState = {
@@ -43,6 +43,22 @@ function AddWorkshopDialog({ open, onClose }) {
   };
 
   const handleSubmit = async () => {
+    //  required fields
+    if (!form.workshopTitle || !form.workshopTitle.trim()) {
+      alert("Workshop title is required.");
+      return;
+    }
+
+    if (!form.workshopTopic || !form.workshopTopic.trim()) {
+      alert("Workshop topic is required.");
+      return;
+    }
+
+    if (!form.workshopTutors || !form.workshopTutors.trim()) {
+      alert("Tutors are required.");
+      return;
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0); 
   
@@ -63,26 +79,27 @@ function AddWorkshopDialog({ open, onClose }) {
     }
 
     try {
-      const token = localStorage.getItem("accessToken");
-
       const payload = {
-        ...form,
+        workshopTitle: form.workshopTitle.trim(),
+        workshopTopic: form.workshopTopic.trim(),
+        workshopObjective: form.workshopObjective ? form.workshopObjective.trim() : '',
+        workshopDescription: form.workshopDescription ? form.workshopDescription.trim() : '',
+        workshopInstructions: form.workshopInstructions ? form.workshopInstructions.trim() : '',
         workshopTutors: form.workshopTutors
           .split(",")
-          .map((tutor) => tutor.trim()),
+          .map((tutor) => tutor.trim())
+          .filter(Boolean),
+        startDate: form.startDate,
+        endDate: form.endDate
       };
 
-      await axios.post("http://localhost:8080/workshop", payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await workshopApi.addWorkshop(payload);
 
       alert("Successfully added new workshop!");
       onClose();
     } catch (err) {
       console.error("Error creating workshop:", err);
-      alert("Failed to create workshop");
+      alert("Failed to create workshop: " + (err.userMessage || "Unknown error"));
     }
   };
 
@@ -98,6 +115,7 @@ function AddWorkshopDialog({ open, onClose }) {
               name="workshopTitle"
               value={form.workshopTitle}
               onChange={handleChange}
+              required
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -107,6 +125,7 @@ function AddWorkshopDialog({ open, onClose }) {
               name="workshopTopic"
               value={form.workshopTopic}
               onChange={handleChange}
+              required
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -149,6 +168,7 @@ function AddWorkshopDialog({ open, onClose }) {
               name="workshopTutors"
               value={form.workshopTutors}
               onChange={handleChange}
+              required
             />
           </Grid>
 

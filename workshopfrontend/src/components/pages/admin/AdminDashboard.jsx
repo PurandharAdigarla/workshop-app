@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import { workshopApi } from "../../../utils/api";
+import { hasRole, logout } from "../../../utils/auth";
 import {
   AppBar,
   Toolbar,
@@ -51,8 +52,9 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
-    if (!token) {
-      navigate("/admin/login");
+    if ((!token || !hasRole("ADMIN")) && location.pathname !== "/login") {
+      navigate("/login");
+      return;
     }
     
     window.history.pushState(null, "", location.pathname);
@@ -77,12 +79,15 @@ export default function AdminDashboard() {
     if (!token) return;
 
     try {
-      const response = await axios.get(
-        `http://localhost:8080/workshop/${type}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      let response;
+      
+      if (type === "upcoming") {
+        response = await workshopApi.getUpcomingWorkshops();
+      } else if (type === "ongoing") {
+        response = await workshopApi.getOngoingWorkshops();
+      } else if (type === "completed") {
+        response = await workshopApi.getCompletedWorkshops();
+      }
 
       const formatted = response.data.map((w, i) => ({
         id: i + 1,
@@ -101,7 +106,9 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("Fetch failed:", error);
       localStorage.removeItem("accessToken");
-      navigate("/admin/login");
+      if (location.pathname !== "/login") {
+        navigate("/login");
+      }
     }
   };
 
@@ -110,8 +117,7 @@ export default function AdminDashboard() {
   }, [activeTab]);
 
   const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    navigate("/admin/login");
+    logout(navigate);
   };
 
   const handleEdit = (workshop) => {
@@ -351,12 +357,9 @@ export default function AdminDashboard() {
 
       <EditWorkshopDialog
         open={openEditDialog}
-        onClose={() => {
-          setOpenEditDialog(false);
-          fetchWorkshops(activeTab);
-        }}
+        onClose={() => setOpenEditDialog(false)}
         workshop={selectedWorkshop}
-        onSuccess={() => handleActionSuccess("Workshop updated successfully")}
+        onSuccess={handleActionSuccess}
       />
 
       <DeleteWorkshopDialog

@@ -9,17 +9,18 @@ import com.aptr.workshop_backend.exception.BadRequestException;
 import com.aptr.workshop_backend.exception.ConflictException;
 import com.aptr.workshop_backend.exception.ResourceNotFoundException;
 import com.aptr.workshop_backend.mapper.WorkshopMapper;
+import com.aptr.workshop_backend.mapper.AttendeeMapper;
 import com.aptr.workshop_backend.repository.AttendeeRepo;
 import com.aptr.workshop_backend.repository.AttendeeWorkshopRegistrationRepo;
 import com.aptr.workshop_backend.repository.WorkshopRepo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -31,20 +32,22 @@ public class WorkshopService {
     private final AttendeeRepo attendeeRepo;
     private final AttendeeWorkshopRegistrationRepo attendeeWorkshopRegistrationRepo;
     private final WorkshopMapper workshopMapper;
+    private final PasswordEncoder passwordEncoder;
 
     public String addWorkshop(Workshop workshop) {
         LocalDate currentDate = LocalDate.now();
         workshop.setCreatedDate(currentDate);
 
         if (workshop.getStartDate().isAfter(workshop.getEndDate())) {
-            return "Start date cannot be after end date";
+            throw new BadRequestException("Start date cannot be after end date");
         }
         if (workshop.getStartDate().isBefore(currentDate) || workshop.getEndDate().isBefore(currentDate)) {
-            return "Start and end dates must be in the future";
+            throw new BadRequestException("Start and end dates must be in the future");
         }
 
         workshop.setWorkshopState(determineWorkshopState(workshop.getStartDate(), workshop.getEndDate()));
-        workshopRepo.save(workshop);
+        Workshop savedWorkshop = workshopRepo.save(workshop);
+        log.info("Workshop created successfully with ID: {}", savedWorkshop.getWorkshopId());
         return "New workshop created successfully";
     }
 
@@ -62,17 +65,14 @@ public class WorkshopService {
 
     public String editWorkshop(Long workshopId, WorkshopDto workshopDto) {
         if (workshopDto == null) {
-            return "Workshop data is required";
+            throw new BadRequestException("Workshop data is required");
         }
 
-        Optional<Workshop> optionalWorkshop = workshopRepo.findById(workshopId);
-        if (optionalWorkshop.isEmpty()) {
-            return "Workshop not found";
-        }
+        Workshop existingWorkshop = workshopRepo.findById(workshopId)
+            .orElseThrow(() -> new ResourceNotFoundException("Workshop", "id", workshopId));
         
-        Workshop existingWorkshop = optionalWorkshop.get();
         LocalDate today = LocalDate.now();
-        
+    
         LocalDate oldStartDate = existingWorkshop.getStartDate();
         LocalDate oldEndDate = existingWorkshop.getEndDate();
         WorkshopState currentState = existingWorkshop.getWorkshopState();
@@ -80,55 +80,55 @@ public class WorkshopService {
         try {
             if (workshopDto.startDate() != null && workshopDto.endDate() != null) {
                 if (workshopDto.endDate().isBefore(workshopDto.startDate())) {
-                    return "End date must be after start date";
+                    throw new BadRequestException("End date must be after start date");
                 }
                 
                 if (currentState == WorkshopState.ONGOING) {
                     if (!workshopDto.startDate().isEqual(oldStartDate)) {
-                        return "Start date cannot be modified for ongoing workshops";
+                        throw new BadRequestException("Start date cannot be modified for ongoing workshops");
                     }
                     
                     if (workshopDto.endDate().isBefore(today)) {
-                        return "End date must be today or later for ongoing workshops";
+                        throw new BadRequestException("End date must be today or later for ongoing workshops");
                     }
                 }
                 
                 if (currentState == WorkshopState.UPCOMING) {
                     if (workshopDto.startDate().isBefore(today)) {
-                        return "Start date must be today or later for upcoming workshops";
+                        throw new BadRequestException("Start date must be today or later for upcoming workshops");
                     }
                     
                     if (workshopDto.endDate().isBefore(today)) {
-                        return "End date must be today or later for upcoming workshops";
+                        throw new BadRequestException("End date must be today or later for upcoming workshops");
                     }
                 }
                 
                 if (currentState == WorkshopState.COMPLETED) {
                     WorkshopState newState = determineWorkshopState(workshopDto.startDate(), workshopDto.endDate());
                     if (newState != WorkshopState.COMPLETED) {
-                        return "Cannot change completed workshop to " + newState + " state";
+                        throw new BadRequestException("Cannot change completed workshop to " + newState + " state");
                     }
                 }
             } else if (workshopDto.startDate() != null) {
                 if (currentState == WorkshopState.ONGOING) {
-                    return "Start date cannot be modified for ongoing workshops";
+                    throw new BadRequestException("Start date cannot be modified for ongoing workshops");
                 }
                 
                 if (currentState == WorkshopState.UPCOMING && workshopDto.startDate().isBefore(today)) {
-                    return "Start date must be today or later for upcoming workshops";
+                    throw new BadRequestException("Start date must be today or later for upcoming workshops");
                 }
                 
                 if (workshopDto.startDate().isAfter(existingWorkshop.getEndDate())) {
-                    return "Start date cannot be after existing end date";
+                    throw new BadRequestException("Start date cannot be after existing end date");
                 }
             } else if (workshopDto.endDate() != null) {
                 if (workshopDto.endDate().isBefore(existingWorkshop.getStartDate())) {
-                    return "End date cannot be before existing start date";
+                    throw new BadRequestException("End date cannot be before existing start date");
                 }
                 
                 if ((currentState == WorkshopState.ONGOING || currentState == WorkshopState.UPCOMING) && 
                      workshopDto.endDate().isBefore(today)) {
-                    return "End date must be today or later for " + currentState.toString().toLowerCase() + " workshops";
+                    throw new BadRequestException("End date must be today or later for " + currentState.toString().toLowerCase() + " workshops");
                 }
             }
             
@@ -143,7 +143,7 @@ public class WorkshopService {
             workshopRepo.save(existingWorkshop);
             return "Workshop updated successfully";
         } catch (Exception e) {
-            return "Error updating workshop: " + e.getMessage();
+            throw new BadRequestException("Error updating workshop: " + e.getMessage());
         }
     }
 
@@ -181,31 +181,38 @@ public class WorkshopService {
     }
 
     public String deregisterAttendeeFromWorkshop(WorkshopRegistrationRequestDto dto) {
-        Optional<AttendeeWorkshopRegistration> registrationOpt =
-                attendeeWorkshopRegistrationRepo
-                        .findByAttendee_AttendeeIdAndWorkshop_WorkshopId(dto.attendeeId(), dto.workshopId());
-        if (registrationOpt.isEmpty()) {
-            return "No registration found for the attendee in this workshop";
-        }
-        Workshop workshop = registrationOpt.get().getWorkshop();
+        AttendeeWorkshopRegistration registration = attendeeWorkshopRegistrationRepo
+                .findByAttendee_AttendeeIdAndWorkshop_WorkshopId(dto.attendeeId(), dto.workshopId())
+                .orElseThrow(() -> new ResourceNotFoundException("Registration", "attendee and workshop", 
+                    dto.attendeeId() + " and " + dto.workshopId()));
+        
+        Workshop workshop = registration.getWorkshop();
         if (workshop.getWorkshopState() == WorkshopState.COMPLETED) {
-            return "Cannot deregister from a completed workshop";
+            throw new BadRequestException("Cannot deregister from a completed workshop");
         }
-        attendeeWorkshopRegistrationRepo.delete(registrationOpt.get());
-        return "Deregistration successful";
+        
+        try {
+            attendeeWorkshopRegistrationRepo.delete(registration);
+            log.info("Attendee {} successfully deregistered from workshop {}", dto.attendeeId(), dto.workshopId());
+            return "Deregistration successful";
+        } catch (Exception e) {
+            log.error("Error during workshop deregistration: {}", e.getMessage());
+            throw new BadRequestException("Deregistration failed: " + e.getMessage());
+        }
     }
 
     public String softDeleteWorkshop(Long workshopId) {
         Optional<Workshop> optional = workshopRepo.findById(workshopId);
         if (optional.isEmpty()) {
-            return "Workshop not found";
+            throw new ResourceNotFoundException("Workshop", "id", workshopId);
         }
         Workshop workshop = optional.get();
         if (workshop.isWorkshopDeleted()) {
-            return "Workshop is already deleted";
+            throw new ConflictException("Workshop", "id", workshopId);
         }
         workshop.setWorkshopDeleted(true);
         workshopRepo.save(workshop);
+        log.info("Workshop with ID: {} soft deleted successfully", workshopId);
         return "Workshop soft deleted successfully";
     }
 
@@ -236,29 +243,24 @@ public class WorkshopService {
     }
 
     public String submitFeedback(FeedbackDto dto) {
-        Optional<AttendeeWorkshopRegistration> regOpt =
-                attendeeWorkshopRegistrationRepo.findByAttendee_AttendeeIdAndWorkshop_WorkshopId(
-                        dto.attendeeId(), dto.workshopId()
-                );
-
-        if (regOpt.isEmpty()) {
-            return "No registration found for attendee in this workshop";
-        }
-
-        AttendeeWorkshopRegistration registration = regOpt.get();
+        AttendeeWorkshopRegistration registration = attendeeWorkshopRegistrationRepo
+            .findByAttendee_AttendeeIdAndWorkshop_WorkshopId(dto.attendeeId(), dto.workshopId())
+            .orElseThrow(() -> new ResourceNotFoundException("Registration", 
+                "attendee and workshop", dto.attendeeId() + " and " + dto.workshopId()));
 
         if (registration.getFeedbackGiven() != null && registration.getFeedbackGiven()) {
-            return "Feedback has already been submitted";
+            throw new ConflictException("Feedback has already been submitted");
         }
 
         Workshop workshop = registration.getWorkshop();
         if (workshop.getWorkshopState() != WorkshopState.COMPLETED) {
-            return "Cannot submit feedback until the workshop is completed";
+            throw new BadRequestException("Cannot submit feedback until the workshop is completed");
         }
 
         if (dto.rating() == null || dto.rating() < 0 || dto.rating() > 5) {
-            return "Rating must be between 0 and 5";
+            throw new BadRequestException("Rating must be between 0 and 5");
         }
+        
         registration.setRating(dto.rating());
         registration.setComment(dto.comment());
         registration.setFeedbackGiven(true);
@@ -334,6 +336,28 @@ public class WorkshopService {
             feedbacks.size(),
             feedbacks
         );
+    }
+
+    public String signup(AttendeeRegisterDto attendeeRegisterDto) {
+        if (attendeeRepo.existsByAttendeeEmail(attendeeRegisterDto.attendeeEmail())) {
+            throw new ConflictException("Attendee", "email", attendeeRegisterDto.attendeeEmail());
+        }
+
+        if (attendeeRepo.existsByAttendeePhoneNumber(attendeeRegisterDto.attendeePhoneNumber())) {
+            throw new ConflictException("Attendee", "phone number", attendeeRegisterDto.attendeePhoneNumber());
+        }
+        
+        try {
+            Attendee attendee = AttendeeMapper.INSTANCE.attendeeRegisterDtoToAttendee(attendeeRegisterDto);
+            attendee.setAttendeePassword(passwordEncoder.encode(attendeeRegisterDto.attendeePassword()));
+            attendeeRepo.save(attendee);
+            
+            log.info("Attendee registered successfully with email: {}", attendeeRegisterDto.attendeeEmail());
+            return "Attendee registered successfully";
+        } catch (Exception e) {
+            log.error("Error registering attendee: {}", e.getMessage());
+            throw new BadRequestException("Failed to register attendee: " + e.getMessage());
+        }
     }
 
 }

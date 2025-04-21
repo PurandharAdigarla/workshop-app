@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import {
   Paper,
   Box,
@@ -10,6 +9,7 @@ import {
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import FeedbackDetailsDialog from './FeedbackDetailsDialog';
+import { workshopApi } from '../../../utils/api';
 
 export default function FeedbacksTable() {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -29,10 +29,7 @@ export default function FeedbacksTable() {
       setLoading(true);
       setError(null);
       
-      const token = localStorage.getItem('accessToken');
-      const response = await axios.get('http://localhost:8080/workshop/feedback', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await workshopApi.getAllFeedbacks();
       
       console.log('Feedback response:', response.data);
       
@@ -54,7 +51,7 @@ export default function FeedbacksTable() {
       setFeedbacks(formattedData);
     } catch (error) {
       console.error('Error fetching feedbacks:', error);
-      setError('Failed to load feedbacks. Please try again later.');
+      setError(error.userMessage || 'Failed to load feedbacks. Please try again later.');
     } finally {
       setLoading(false);
     }

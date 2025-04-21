@@ -17,7 +17,7 @@ import {
 } from "@mui/material";
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import axios from "axios";
+import { workshopApi } from "../../../utils/api";
 import AddAttendeeDialog from "./AddAttendeeDialog";
 
 function AttendeesDialog({ open, onClose, workshopId }) {
@@ -31,15 +31,7 @@ function AttendeesDialog({ open, onClose, workshopId }) {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem("accessToken");
-      const res = await axios.get(
-        `http://localhost:8080/workshop/${workshopId}/registrations`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await workshopApi.getRegistrations(workshopId);
 
       const fetchedAttendees = Array.isArray(res.data.attendees)
         ? res.data.attendees

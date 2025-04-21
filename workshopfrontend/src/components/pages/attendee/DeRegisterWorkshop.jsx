@@ -1,38 +1,22 @@
-import axios from "axios";
+import { workshopApi } from "../../../utils/api";
 
 export const DeRegisterWorkshop = async (workshopId) => {
-  const token = localStorage.getItem("accessToken");
   const attendeeId = parseInt(localStorage.getItem("attendeeId"));
 
-  if (!token || !attendeeId) {
-    console.error("Missing token or attendee ID");
-    return { success: false, error: "Missing token or attendee ID" };
+  if (!attendeeId) {
+    console.error("Missing attendee ID");
+    return { success: false, error: "Missing attendee ID" };
   }
 
   try {
-    const payload = {
-      attendeeId,
-      workshopId,
-    };
-
-    const res = await axios.delete(
-      "http://localhost:8080/workshop/deregister",
-      {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        data: payload,
-      }
-    );
-
-    return { success: true, data: res.data };
+    const response = await workshopApi.deregisterFromWorkshop(workshopId, attendeeId);
+    return { success: true, data: response.data };
   } catch (err) {
     console.error("Deregistration failed:", err);
     return { 
       success: false, 
       error: err,
-      message: err.response?.data || "Failed to deregister from workshop."
+      message: err.userMessage || "Failed to deregister from workshop"
     };
   }
 };

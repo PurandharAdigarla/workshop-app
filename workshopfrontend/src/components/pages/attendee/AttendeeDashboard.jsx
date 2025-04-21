@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import { workshopApi } from "../../../utils/api";
+import { hasRole, logout } from "../../../utils/auth";
 import {
   AppBar,
   Toolbar,
@@ -60,12 +61,7 @@ export default function AttendeeDashboard() {
 
   const fetchPendingFeedbacks = async () => {
     try {
-      const res = await axios.get(
-        `http://localhost:8080/workshop/pending-feedbacks/${attendeeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await workshopApi.getPendingFeedbacks(attendeeId);
       setPendingFeedbacks(res.data || []);
     } catch (err) {
       console.error("Failed to fetch pending feedbacks", err);
@@ -74,12 +70,7 @@ export default function AttendeeDashboard() {
 
   const fetchRegisteredIds = async () => {
     try {
-      const res = await axios.get(
-        `http://localhost:8080/workshop/registered/${attendeeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await workshopApi.getRegisteredWorkshops(attendeeId);
       const registered = res.data || [];
       const ids = registered.map((w) => Number(w.workshopId)).filter(Boolean);
       setRegisteredIds(ids);
@@ -90,7 +81,10 @@ export default function AttendeeDashboard() {
 
   const fetchWorkshops = async (type) => {
     if (!token || !attendeeId) {
-      navigate("/attendee/login");
+      // Don't navigate if we're already on the login page
+      if (location.pathname !== "/login") {
+        navigate("/login");
+      }
       return;
     }
 
@@ -99,19 +93,13 @@ export default function AttendeeDashboard() {
 
       let response;
       if (type === "registered") {
-        response = await axios.get(
-          `http://localhost:8080/workshop/registered/${attendeeId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      } else {
-        response = await axios.get(
-          `http://localhost:8080/workshop/${type}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        response = await workshopApi.getRegisteredWorkshops(attendeeId);
+      } else if (type === "upcoming") {
+        response = await workshopApi.getUpcomingWorkshops();
+      } else if (type === "ongoing") {
+        response = await workshopApi.getOngoingWorkshops();
+      } else if (type === "completed") {
+        response = await workshopApi.getCompletedWorkshops();
       }
 
       const formatted = (response.data || []).map((w, i) => ({
@@ -131,7 +119,10 @@ export default function AttendeeDashboard() {
     } catch (error) {
       console.error("Fetch failed:", error);
       localStorage.clear();
-      navigate("/attendee/login");
+      // Don't navigate if we're already on the login page
+      if (location.pathname !== "/login") {
+        navigate("/login");
+      }
     }
   };
 
@@ -153,23 +144,26 @@ export default function AttendeeDashboard() {
   };
 
   useEffect(() => {
-    if (!token || !attendeeId) {
-      navigate("/attendee/login");
+    // Check if user is logged in and has ATTENDEE role
+    const accessToken = localStorage.getItem('accessToken');
+    // Only redirect if we're not already on the login page
+    // This prevents redirect loops
+    if ((!accessToken || !hasRole("ATTENDEE")) && location.pathname !== "/login") {
+      navigate('/login');
       return;
     }
-    
-    // Prevent navigation back to login page
-    window.history.pushState(null, "", location.pathname);
-    const preventNavigation = (e) => {
-      window.history.pushState(null, "", location.pathname);
+
+    // Prevent back navigation to login page
+    window.history.pushState(null, '', location.pathname);
+    const handlePopState = () => {
+      window.history.pushState(null, '', location.pathname);
     };
-    
-    window.addEventListener("popstate", preventNavigation);
-    
+    window.addEventListener('popstate', handlePopState);
+
     return () => {
-      window.removeEventListener("popstate", preventNavigation);
+      window.removeEventListener('popstate', handlePopState);
     };
-  }, [navigate, location.pathname, token, attendeeId]);
+  }, [navigate, location.pathname]);
 
   useEffect(() => {
     fetchWorkshops(activeTab);
@@ -180,8 +174,7 @@ export default function AttendeeDashboard() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.clear();
-    navigate("/attendee/login");
+    logout(navigate);
   };
 
   const handleDeregisterClick = (workshop) => {
@@ -190,15 +183,26 @@ export default function AttendeeDashboard() {
   };
 
   const handleDeregisterSuccess = async () => {
-    if (activeTab === "registered") {
-      await fetchWorkshops("registered");
-    } else {
+    try {
+      // First refresh the registered IDs
       await fetchRegisteredIds();
+      
+      // Then refresh the current tab's data
       await fetchWorkshops(activeTab);
+      
+      // Show success message
+      setSuccessMessage("Successfully deregistered from the workshop");
+      setSnackbarOpen(true);
+      
+      // If we have the attended component ref, refresh it too
+      if (attendedComponentRef.current) {
+        attendedComponentRef.current.refreshAttendedWorkshops();
+      }
+    } catch (error) {
+      console.error("Error refreshing workshops after deregistration:", error);
+      setSuccessMessage("Deregistered successfully, but encountered an error refreshing the page. Please refresh manually.");
+      setSnackbarOpen(true);
     }
-    
-    setSuccessMessage("Successfully deregistered from the workshop");
-    setSnackbarOpen(true);
   };
 
   const handleCloseSnackbar = () => {
@@ -414,7 +418,7 @@ export default function AttendeeDashboard() {
           >
             Attended Workshops
           </Typography>
-          <AttendedComponent ref={attendedComponentRef} />
+          <AttendedComponent ref={attendedComponentRef} attendeeId={attendeeId} />
         </Box>
       </Container>
 
@@ -429,6 +433,7 @@ export default function AttendeeDashboard() {
         onClose={() => setDeRegisterDialogOpen(false)}
         attendeeId={attendeeId}
         workshopId={workshopToDeregister?.workshopId}
+        workshopTitle={workshopToDeregister?.workshopTitle}
         onSuccess={handleDeregisterSuccess}
       />
 

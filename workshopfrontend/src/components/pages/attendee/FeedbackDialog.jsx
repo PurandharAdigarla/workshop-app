@@ -11,7 +11,7 @@ import {
     Alert
   } from "@mui/material";
   import { useState } from "react";
-  import axios from "axios";
+  import { workshopApi } from "../../../utils/api";
   
   export default function FeedbackDialog({ open, onClose, workshop, attendeeId, onSubmitted }) {
     const [rating, setRating] = useState("");
@@ -25,22 +25,18 @@ import {
       }
   
       try {
-        const token = localStorage.getItem("accessToken");
-  
-        await axios.post("http://localhost:8080/workshop/submit-feedback", {
+        await workshopApi.submitFeedback({
           attendeeId: Number(attendeeId),
           workshopId: Number(workshop.workshopId),
           rating: Number(rating),
           comment
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
         });
   
         setRating("");
         setComment("");
         onSubmitted(); 
       } catch (err) {
-        setError(err.response?.data || "Failed to submit feedback");
+        setError(err.userMessage || err.response?.data || "Failed to submit feedback");
       }
     };
   
