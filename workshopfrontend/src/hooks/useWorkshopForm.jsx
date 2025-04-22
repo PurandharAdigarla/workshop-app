@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as dateUtils from '../utils/dateUtils';
 
-/**
- * Error messages for workshop validation
- */
 export const ERROR_MESSAGES = {
   REQUIRED_FIELDS: "Title and Topic are required",
   REQUIRED_TUTORS: "Tutors are required",
@@ -17,11 +14,6 @@ export const ERROR_MESSAGES = {
   NOT_AUTHENTICATED: "You are not authenticated. Please log in again."
 };
 
-/**
- * Custom hook to manage workshop form state and validation
- * @param {Object} workshop - The workshop data
- * @returns {Object} - Form state, handlers, and validation functions
- */
 const useWorkshopForm = (workshop) => {
   const [form, setForm] = useState({
     workshopTitle: "",
@@ -81,9 +73,6 @@ const useWorkshopForm = (workshop) => {
     }
   }, [workshop]);
   
-  /**
-   * Updates helper text for date fields based on workshop state
-   */
   const updateDateHelperText = () => {
     if (isCompleted) {
       setDateHelperText({
@@ -108,20 +97,11 @@ const useWorkshopForm = (workshop) => {
     }
   };
   
-  /**
-   * Handles form field changes
-   * @param {Object} e - Event object
-   */
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
   
-  /**
-   * Handles date field changes with validation
-   * @param {string} key - Field name (startDate or endDate)
-   * @param {Date} value - New date value
-   */
   const handleDateChange = (key, value) => {
     // Don't allow date changes for completed workshops
     if (isCompleted) {
@@ -170,10 +150,6 @@ const useWorkshopForm = (workshop) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
   
-  /**
-   * Validates form fields and dates
-   * @returns {boolean} - Whether form is valid
-   */
   const validateForm = () => {
     // Check required fields with trimming
     if (!form.workshopTitle || form.workshopTitle.trim() === '') {
@@ -196,10 +172,6 @@ const useWorkshopForm = (workshop) => {
     return validateDates();
   };
   
-  /**
-   * Validates workshop dates based on workshop state
-   * @returns {boolean} - Whether dates are valid
-   */
   const validateDates = () => {
     const today = dateUtils.normalizeDate(new Date());
     const startDate = dateUtils.normalizeDate(form.startDate);
@@ -254,10 +226,6 @@ const useWorkshopForm = (workshop) => {
     return true;
   };
   
-  /**
-   * Prepares form data for submission
-   * @returns {Object} - Formatted workshop data
-   */
   const getFormData = () => {
     return {
       workshopId: workshop?.workshopId,

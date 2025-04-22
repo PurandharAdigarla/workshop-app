@@ -31,10 +31,6 @@ export default function AttendeeSignup() {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
-  /**
-   * Validates form fields, trimming whitespace for text inputs
-   * @returns {boolean} Whether the form is valid
-   */
   const validateForm = () => {
     const newErrors = {};
     

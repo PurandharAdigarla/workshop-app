@@ -44,7 +44,7 @@ api.interceptors.response.use(
         localStorage.removeItem('userRole');
 
         // Redirect to unified login
-        window.location.href = '/login';
+        //window.location.href = '/login';
       }
     } else if (error.request) {
       errorMessage = 'Server is not responding. Please try again later.';

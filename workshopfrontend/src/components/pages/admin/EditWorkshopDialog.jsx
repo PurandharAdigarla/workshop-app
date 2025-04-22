@@ -17,19 +17,10 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { workshopApi } from "../../../utils/api";
 import useWorkshopForm, { ERROR_MESSAGES } from "../../../hooks/useWorkshopForm";
 
-/**
- * Dialog component for editing workshop details
- * @param {Object} props - Component props
- * @param {boolean} props.open - Whether the dialog is open
- * @param {Function} props.onClose - Function to call when dialog is closed
- * @param {Object} props.workshop - Workshop data to edit
- * @param {Function} props.onSuccess - Function to call on successful edit
- */
 const EditWorkshopDialog = ({ open, onClose, workshop, onSuccess }) => {
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Use our custom hook for form state and validation
   const {
     form,
     error,
@@ -44,10 +35,6 @@ const EditWorkshopDialog = ({ open, onClose, workshop, onSuccess }) => {
 
   const { isOngoing, isUpcoming, isCompleted } = workshopState;
 
-  /**
-   * Gets a label describing the workshop's status
-   * @returns {string} The status label
-   */
   const getStatusLabel = () => {
     if (isCompleted) return "(Completed Workshop - Dates cannot be modified)";
     if (isOngoing) return "(Ongoing Workshop - Start date cannot be modified)";
@@ -55,14 +42,11 @@ const EditWorkshopDialog = ({ open, onClose, workshop, onSuccess }) => {
     return "";
   };
 
-  /**
-   * Handles form submission
-   */
+
   const handleSubmit = async () => {
     setLoading(true);
     setError("");
     
-    // Validate form
     if (!validateForm()) {
       setLoading(false);
       return;
@@ -77,8 +61,6 @@ const EditWorkshopDialog = ({ open, onClose, workshop, onSuccess }) => {
         return;
       }
 
-      // Get form data ready for submission
-      // All form fields are trimmed to remove leading and trailing whitespace
       const payload = getFormData();
       console.log("Sending payload:", payload);
 
