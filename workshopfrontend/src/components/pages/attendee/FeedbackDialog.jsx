@@ -8,7 +8,8 @@ import {
     Typography,
     MenuItem,
     Snackbar,
-    Alert
+    Alert,
+    Box
   } from "@mui/material";
   import { useState } from "react";
   import { workshopApi } from "../../../utils/api";
@@ -40,9 +41,15 @@ import {
       }
     };
   
+    const handleClose = () => {
+      if (onClose) {
+        onClose();
+      }
+    };
+  
     return (
       <>
-        <Dialog open={open} disableEscapeKeyDown>
+        <Dialog open={open} onClose={handleClose}>
           <DialogTitle>Feedback for "{workshop?.workshopTitle}"</DialogTitle>
           <DialogContent>
             <Typography>Rate this workshop (0 - 5):</Typography>
@@ -69,7 +76,10 @@ import {
             />
           </DialogContent>
           <DialogActions>
-            <Button variant="contained" onClick={handleSubmit}>Submit</Button>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', px: 1 }}>
+              <Button onClick={handleClose} color="inherit">Close</Button>
+              <Button variant="contained" color="primary" onClick={handleSubmit}>Submit</Button>
+            </Box>
           </DialogActions>
         </Dialog>
   

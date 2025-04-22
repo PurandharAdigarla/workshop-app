@@ -28,6 +28,7 @@ import WorkshopDetailsDialog from "./WorkshopDetailsDialog";
 import RegisterForWorkshop from "./RegisterForWorkshop";
 import DeRegisterDialog from "./DeRegisterDialog";
 import FeedbackDialog from "./FeedbackDialog";
+import PendingFeedbacksDialog from "./PendingFeedbacksDialog";
 import AttendedComponent from "./AttendedComponent";
 
 const tabLabels = ["ongoing", "upcoming", "completed", "registered"];
@@ -48,6 +49,8 @@ export default function AttendeeDashboard() {
   const [feedbackIndex, setFeedbackIndex] = useState(0);
   const [successMessage, setSuccessMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [showPendingFeedbacksDialog, setShowPendingFeedbacksDialog] = useState(false);
   
   const attendedComponentRef = useRef(null);
 
@@ -60,28 +63,34 @@ export default function AttendeeDashboard() {
   };
 
   const fetchPendingFeedbacks = async () => {
+    if (!attendeeId) return [];
+    
     try {
       const res = await workshopApi.getPendingFeedbacks(attendeeId);
-      setPendingFeedbacks(res.data || []);
+      const feedbacks = res.data || [];
+      setPendingFeedbacks(feedbacks);
+      return feedbacks;
     } catch (err) {
       console.error("Failed to fetch pending feedbacks", err);
+      setPendingFeedbacks([]);
+      return [];
     }
   };
 
   const fetchRegisteredIds = async () => {
     try {
       const res = await workshopApi.getRegisteredWorkshops(attendeeId);
-      const registered = res.data || [];
-      const ids = registered.map((w) => Number(w.workshopId)).filter(Boolean);
+      const ids = (res.data || []).map((w) => Number(w.workshopId)).filter(Boolean);
       setRegisteredIds(ids);
+      return ids;
     } catch (err) {
       console.error("Failed to fetch registered workshop IDs", err);
+      return [];
     }
   };
 
   const fetchWorkshops = async (type) => {
     if (!token || !attendeeId) {
-      // Don't navigate if we're already on the login page
       if (location.pathname !== "/login") {
         navigate("/login");
       }
@@ -118,9 +127,8 @@ export default function AttendeeDashboard() {
       setWorkshops(formatted);
     } catch (error) {
       console.error("Fetch failed:", error);
-      localStorage.clear();
-      // Don't navigate if we're already on the login page
       if (location.pathname !== "/login") {
+        localStorage.clear();
         navigate("/login");
       }
     }
@@ -129,26 +137,23 @@ export default function AttendeeDashboard() {
   const handleRegister = async (workshopId) => {
     try {
       const res = await RegisterForWorkshop(workshopId);
+      setSuccessMessage(res.success 
+        ? "Successfully registered for the workshop!" 
+        : (res.error?.response?.data || "Registration failed"));
+      setSnackbarOpen(true);
+      
       if (res.success) {
         await fetchWorkshops(activeTab);
-        setSuccessMessage("Successfully registered for the workshop!");
-        setSnackbarOpen(true);
-      } else {
-        setSuccessMessage(res.error?.response?.data || "Registration failed");
-        setSnackbarOpen(true);
       }
     } catch (error) {
       setSuccessMessage("An error occurred during registration");
       setSnackbarOpen(true);
     }
   };
-
+  
+  // Authentication check
   useEffect(() => {
-    // Check if user is logged in and has ATTENDEE role
-    const accessToken = localStorage.getItem('accessToken');
-    // Only redirect if we're not already on the login page
-    // This prevents redirect loops
-    if ((!accessToken || !hasRole("ATTENDEE")) && location.pathname !== "/login") {
+    if ((!token || !hasRole("ATTENDEE")) && location.pathname !== "/login") {
       navigate('/login');
       return;
     }
@@ -160,22 +165,22 @@ export default function AttendeeDashboard() {
     };
     window.addEventListener('popstate', handlePopState);
 
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [navigate, location.pathname]);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate, location.pathname, token]);
 
+  // Fetch workshops when tab changes
   useEffect(() => {
     fetchWorkshops(activeTab);
   }, [activeTab]);
 
+  // Initialize pending feedbacks
   useEffect(() => {
-    fetchPendingFeedbacks(); 
-  }, []);
+    if (attendeeId) {
+      fetchPendingFeedbacks();
+    }
+  }, [attendeeId]);
 
-  const handleLogout = () => {
-    logout(navigate);
-  };
+  const handleLogout = () => logout(navigate);
 
   const handleDeregisterClick = (workshop) => {
     setWorkshopToDeregister(workshop);
@@ -184,30 +189,23 @@ export default function AttendeeDashboard() {
 
   const handleDeregisterSuccess = async () => {
     try {
-      // First refresh the registered IDs
       await fetchRegisteredIds();
-      
-      // Then refresh the current tab's data
       await fetchWorkshops(activeTab);
       
-      // Show success message
       setSuccessMessage("Successfully deregistered from the workshop");
       setSnackbarOpen(true);
       
-      // If we have the attended component ref, refresh it too
       if (attendedComponentRef.current) {
         attendedComponentRef.current.refreshAttendedWorkshops();
       }
     } catch (error) {
       console.error("Error refreshing workshops after deregistration:", error);
-      setSuccessMessage("Deregistered successfully, but encountered an error refreshing the page. Please refresh manually.");
+      setSuccessMessage("Deregistered successfully, but encountered an error refreshing the page.");
       setSnackbarOpen(true);
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbarOpen(false);
-  };
+  const handleCloseSnackbar = () => setSnackbarOpen(false);
 
   const columns = [
     {
@@ -231,11 +229,7 @@ export default function AttendeeDashboard() {
         </Button>
       ),
     },
-    { 
-      field: "workshopTopic", 
-      headerName: "Topic", 
-      width: 300,
-    },
+    { field: "workshopTopic", headerName: "Topic", width: 300 },
     { 
       field: "workshopTutors", 
       headerName: "Tutors", 
@@ -268,15 +262,10 @@ export default function AttendeeDashboard() {
         const isRegistered = registeredIds.includes(params.row.workshopId);
 
         return (
-          <Box sx={{ 
-            display: "flex", 
-            justifyContent: 'center', 
-            width: '100%', 
-            pt: 1
-          }}>
+          <Box sx={{ display: "flex", justifyContent: 'center', width: '100%', pt: 1 }}>
             {activeTab === "completed" && (
               <Chip 
-                label="Closed" 
+                label="Completed" 
                 color="default" 
                 size="small"
                 icon={<DoNotDisturbIcon />}
@@ -323,28 +312,51 @@ export default function AttendeeDashboard() {
     },
   ];
 
-  // Handler for when feedback is submitted
-  const handleFeedbackSubmitted = () => {
-    const next = feedbackIndex + 1;
-    if (next < pendingFeedbacks.length) {
-      setFeedbackIndex(next);
+  const handlePendingFeedbacksClick = async () => {
+    const feedbacks = await fetchPendingFeedbacks();
+    
+    if (feedbacks && feedbacks.length > 0) {
+      setShowPendingFeedbacksDialog(true);
     } else {
-      setPendingFeedbacks([]);
-      fetchWorkshops(activeTab);
-      
-      // Refresh the attended workshops component
-      if (attendedComponentRef.current) {
-        attendedComponentRef.current.refreshAttendedWorkshops();
-      }
+      setSuccessMessage("No pending feedbacks available");
+      setSnackbarOpen(true);
     }
   };
 
+  const handleSelectFeedbackWorkshop = (index) => {
+    setFeedbackIndex(index);
+    setShowPendingFeedbacksDialog(false);
+    setShowFeedbackDialog(true);
+  };
+
+  const handleFeedbackSubmitted = async () => {
+    // Remove the current workshop from pending feedbacks array
+    const updatedFeedbacks = [...pendingFeedbacks];
+    updatedFeedbacks.splice(feedbackIndex, 1);
+    setPendingFeedbacks(updatedFeedbacks);
+    
+    if (updatedFeedbacks.length > 0) {
+      const newIndex = feedbackIndex >= updatedFeedbacks.length ? 0 : feedbackIndex;
+      setFeedbackIndex(newIndex);
+    } else {
+      setShowFeedbackDialog(false);
+    }
+    
+    setSuccessMessage("Feedback submitted successfully");
+    setSnackbarOpen(true);
+    
+    // Refresh data
+    await fetchWorkshops(activeTab);
+    if (attendedComponentRef.current) {
+      attendedComponentRef.current.refreshAttendedWorkshops();
+    }
+  };
+
+  const handleFeedbackDialogClose = () => setShowFeedbackDialog(false);
+  const handlePendingFeedbacksDialogClose = () => setShowPendingFeedbacksDialog(false);
+
   return (
-    <Box sx={{ 
-      minHeight: "100vh",
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
+    <Box sx={{ minHeight: "100vh", display: 'flex', flexDirection: 'column' }}>
       <AppBar position="static">
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
           <Typography variant="h6">Attendee Dashboard</Typography>
@@ -362,7 +374,6 @@ export default function AttendeeDashboard() {
             indicatorColor="primary"
             textColor="primary"
             variant="fullWidth"
-            disabled={pendingFeedbacks.length > 0}
             sx={{ mt: 1 }}
           >
             {tabLabels.map((label, i) => (
@@ -387,12 +398,7 @@ export default function AttendeeDashboard() {
         
         <Paper 
           elevation={1} 
-          sx={{ 
-            width: "100%", 
-            borderRadius: 2,
-            overflow: 'hidden',
-            mb: 4
-          }}
+          sx={{ width: "100%", borderRadius: 2, overflow: 'hidden', mb: 4 }}
         >
           <DataGrid
             rows={workshops}
@@ -403,21 +409,50 @@ export default function AttendeeDashboard() {
             initialState={{
               pagination: { paginationModel: { pageSize: 5, page: 0 } },
             }}
-            // sx={{ minHeight: 350 }}
           />
         </Paper>
       
         {/* Attended Workshops Section */}
         <Box sx={{ mt: 6 }}>
           <Divider sx={{ mb: 4 }} />
-          <Typography 
-            variant="h5" 
-            color="primary" 
-            gutterBottom 
-            sx={{ mb: 3, pl: 1}}
-          >
-            Attended Workshops
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography 
+              variant="h5" 
+              color="primary" 
+              gutterBottom
+              sx={{ pl: 1, mb: 0 }}
+            >
+              Attended Workshops
+            </Typography>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              onClick={handlePendingFeedbacksClick}
+              disabled={pendingFeedbacks.length === 0}
+            >
+              Pending Feedbacks
+              {pendingFeedbacks.length > 0 && (
+                <Box 
+                  component="span" 
+                  sx={{ 
+                    ml: 1, 
+                    bgcolor: 'error.main', 
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: 20,
+                    height: 20,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {pendingFeedbacks.length}
+                </Box>
+              )}
+            </Button>
+          </Box>
           <AttendedComponent ref={attendedComponentRef} attendeeId={attendeeId} />
         </Box>
       </Container>
@@ -437,12 +472,20 @@ export default function AttendeeDashboard() {
         onSuccess={handleDeregisterSuccess}
       />
 
-      {pendingFeedbacks.length > 0 && (
+      <PendingFeedbacksDialog
+        open={showPendingFeedbacksDialog}
+        onClose={handlePendingFeedbacksDialogClose}
+        workshops={pendingFeedbacks}
+        onSelectWorkshop={handleSelectFeedbackWorkshop}
+      />
+
+      {pendingFeedbacks.length > 0 && showFeedbackDialog && (
         <FeedbackDialog
           open={true}
           workshop={pendingFeedbacks[feedbackIndex]}
           attendeeId={attendeeId}
           onSubmitted={handleFeedbackSubmitted}
+          onClose={handleFeedbackDialogClose}
         />
       )}
 

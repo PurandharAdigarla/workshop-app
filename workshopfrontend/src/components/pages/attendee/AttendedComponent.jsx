@@ -126,7 +126,6 @@ const AttendedComponent = forwardRef(({ attendeeId }, ref) => {
         pageSizeOptions={[5, 10]}
         paginationModel={{ page, pageSize }}
         onPaginationModelChange={handlePaginationModelChange}
-        autoHeight
         disableRowSelectionOnClick
       />
     </Paper>
