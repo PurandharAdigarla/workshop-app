@@ -218,7 +218,7 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
     setTimeout(() => {
       onClose();
       setSuccess(false);
-    }, 1500);
+    }, 500);
   };
 
   const handleSubmitExisting = async () => {
@@ -244,7 +244,7 @@ function AddAttendeeDialog({ open, onClose, workshopId, onAttendeeAdded }) {
       setTimeout(() => {
         onClose();
         setSuccess(false);
-      }, 1500);
+      }, 500);
     } catch (err) {
       console.error('Error adding existing attendee:', err);
       

@@ -58,9 +58,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/admin/login", "/admin/register").permitAll()
                         .requestMatchers("/attendees/signup", "/attendees/login").permitAll()
-                        //.requestMatchers("/workshop/upcoming", "/workshop/ongoing", "/workshop/completed").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
-                        //.requestMatchers("/workshop/register", "/workshop/deregister").authenticated()
                         .requestMatchers("/attendee/**").hasRole("ATTENDEE")
                         .anyRequest().authenticated()
                 )

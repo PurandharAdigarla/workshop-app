@@ -18,10 +18,12 @@ import {
   Snackbar,
   useTheme,
 } from "@mui/material";
-import LogoutIcon from '@mui/icons-material/Logout';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
+import Tooltip from "@mui/material/Tooltip";
+import LogoutIcon from "@mui/icons-material/Logout";
+import SyncIcon from "@mui/icons-material/Sync";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
 import { DataGrid } from "@mui/x-data-grid";
 import AddWorkshopDialog from "./AddWorkshopDialog";
 import WorkshopDetailsDialog from "./WorkshopDetailsDialog";
@@ -29,7 +31,7 @@ import AttendeesDialog from "./AttendeesDialog";
 import EditWorkshopDialog from "./EditWorkshopDialog";
 import DeleteWorkshopDialog from "./DeleteWorkshopDialog";
 import FeedbacksTable from "./FeedbacksTable";
- 
+
 const tabLabels = ["ongoing", "upcoming", "completed"];
 
 export default function AdminDashboard() {
@@ -49,6 +51,7 @@ export default function AdminDashboard() {
   const [workshopToDelete, setWorkshopToDelete] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [updateWorkshopState, setUpdateWorkshopState] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -56,14 +59,14 @@ export default function AdminDashboard() {
       navigate("/login");
       return;
     }
-    
+
     window.history.pushState(null, "", location.pathname);
     const preventNavigation = (e) => {
       window.history.pushState(null, "", location.pathname);
     };
-    
+
     window.addEventListener("popstate", preventNavigation);
-    
+
     return () => {
       window.removeEventListener("popstate", preventNavigation);
     };
@@ -80,7 +83,7 @@ export default function AdminDashboard() {
 
     try {
       let response;
-      
+
       if (type === "upcoming") {
         response = await workshopApi.getUpcomingWorkshops();
       } else if (type === "ongoing") {
@@ -114,10 +117,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchWorkshops(activeTab);
-  }, [activeTab]);
+  }, [activeTab, updateWorkshopState]);
 
   const handleLogout = () => {
     logout(navigate);
+  };
+
+  const handleUpdateWorkshopState = async () => {
+    const response = await workshopApi.updateworkshopState();
+    setUpdateWorkshopState(!updateWorkshopState);
   };
 
   const handleEdit = (workshop) => {
@@ -137,12 +145,12 @@ export default function AdminDashboard() {
   };
 
   const columns = [
-    { 
-      field: "workshopId", 
-      headerName: "ID", 
+    {
+      field: "workshopId",
+      headerName: "ID",
       width: 80,
-      align: 'center',
-      headerAlign: 'center',
+      align: "center",
+      headerAlign: "center",
     },
     {
       field: "workshopTitle",
@@ -155,57 +163,59 @@ export default function AdminDashboard() {
             setSelectedWorkshop(params.row);
             setDetailsDialogOpen(true);
           }}
-          sx={{ 
-            justifyContent: 'flex-start', 
-            textAlign: 'left',
-            width: '100%',
+          sx={{
+            justifyContent: "flex-start",
+            textAlign: "left",
+            width: "100%",
           }}
         >
           {params.value}
         </Button>
       ),
     },
-    { 
-      field: "workshopTopic", 
-      headerName: "Topic", 
+    {
+      field: "workshopTopic",
+      headerName: "Topic",
       width: 200,
     },
-    { 
-      field: "workshopTutors", 
-      headerName: "Tutors", 
+    {
+      field: "workshopTutors",
+      headerName: "Tutors",
       width: 200,
-      headerAlign: 'center',
-      align: 'center',
+      headerAlign: "center",
+      align: "center",
     },
-    { 
-      field: "startDate", 
-      headerName: "Start Date", 
+    {
+      field: "startDate",
+      headerName: "Start Date",
       width: 200,
-      align: 'center',
-      headerAlign: 'center',
+      align: "center",
+      headerAlign: "center",
     },
-    { 
-      field: "endDate", 
-      headerName: "End Date", 
+    {
+      field: "endDate",
+      headerName: "End Date",
       width: 200,
-      align: 'center',
-      headerAlign: 'center',
+      align: "center",
+      headerAlign: "center",
     },
     {
       field: "actions",
       headerName: "Actions",
       width: 300,
       sortable: false,
-      align: 'center',
-      headerAlign: 'center',
+      align: "center",
+      headerAlign: "center",
       renderCell: (params) => (
-        <Box sx={{ 
-          display: "flex", 
-          gap: 1, 
-          justifyContent: 'center', 
-          width: '100%', 
-          pt: 1,
-        }}>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+            justifyContent: "center",
+            width: "100%",
+            pt: 1,
+          }}
+        >
           {activeTab !== "completed" && (
             <IconButton
               size="small"
@@ -245,26 +255,39 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <Box sx={{ 
-      minHeight: "100vh", 
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <AppBar position="static">
         <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
           <Typography variant="h6">Admin Dashboard</Typography>
           <Box display="flex" alignItems="center" gap={2}>
-            <Button 
-              variant="contained" 
+            <Tooltip title="Update workshop status">
+              <IconButton
+                color="inherit"
+                onClick={handleUpdateWorkshopState}
+                size="large"
+              >
+                <SyncIcon />
+              </IconButton>
+            </Tooltip>
+            <Button
+              variant="contained"
               color="secondary"
               startIcon={<AddIcon />}
               onClick={() => setOpenDialog(true)}
             >
               Add Workshop
             </Button>
-            <IconButton color="inherit" onClick={handleLogout} size="large">
-              <LogoutIcon />
-            </IconButton>
+            <Tooltip title="Logout">
+              <IconButton color="inherit" onClick={handleLogout} size="large">
+                <LogoutIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Toolbar>
       </AppBar>
@@ -280,9 +303,9 @@ export default function AdminDashboard() {
             sx={{ mt: 1 }}
           >
             {tabLabels.map((label, i) => (
-              <Tab 
-                key={i} 
-                label={label.charAt(0).toUpperCase() + label.slice(1)} 
+              <Tab
+                key={i}
+                label={label.charAt(0).toUpperCase() + label.slice(1)}
               />
             ))}
           </Tabs>
@@ -290,21 +313,21 @@ export default function AdminDashboard() {
       </Box>
 
       <Container maxWidth="xl" sx={{ flex: 1, mt: 4, mb: 6 }}>
-        <Typography 
-          variant="h5" 
-          color="primary" 
-          gutterBottom 
+        <Typography
+          variant="h5"
+          color="primary"
+          gutterBottom
           sx={{ mb: 3, pl: 1 }}
         >
           {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Workshops
         </Typography>
-        
-        <Paper 
-          elevation={1} 
-          sx={{ 
-            width: "100%", 
+
+        <Paper
+          elevation={1}
+          sx={{
+            width: "100%",
             borderRadius: 2,
-            overflow: 'hidden',
+            overflow: "hidden",
           }}
         >
           <DataGrid
@@ -318,14 +341,14 @@ export default function AdminDashboard() {
             }}
           />
         </Paper>
-      
+
         {/* Feedbacks Section */}
         <Box sx={{ mt: 6 }}>
           <Divider sx={{ mb: 4 }} />
-          <Typography 
-            variant="h5" 
+          <Typography
+            variant="h5"
             color="primary"
-            gutterBottom 
+            gutterBottom
             sx={{ mb: 3, pl: 1 }}
           >
             Workshop Feedbacks
@@ -366,20 +389,22 @@ export default function AdminDashboard() {
         open={confirmDeleteOpen}
         onClose={() => setConfirmDeleteOpen(false)}
         workshopId={workshopToDelete}
-        onDeleteSuccess={() => handleActionSuccess("Workshop deleted successfully")}
+        onDeleteSuccess={() =>
+          handleActionSuccess("Workshop deleted successfully")
+        }
       />
 
-      <Snackbar 
+      <Snackbar
         open={snackbarOpen}
         autoHideDuration={4000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity="success" 
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity="success"
           variant="filled"
-          sx={{ width: '100%' }}
+          sx={{ width: "100%" }}
         >
           {successMessage}
         </Alert>

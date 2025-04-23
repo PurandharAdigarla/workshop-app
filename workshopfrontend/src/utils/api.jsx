@@ -77,6 +77,7 @@ export const workshopApi = {
   getRegistrations: (workshopId) => api.get(`/workshop/${workshopId}/registrations`),
   getFeedback: (workshopId) => api.get(`/workshop/feedback/${workshopId}`),
   getAllFeedbacks: () => api.get('/workshop/feedback'),
+  updateworkshopState: () => api.post('admin/update-workshop-states'),
   
   // Attendee api
   signupAttendee: (attendeeData) => api.post('/attendees/signup', attendeeData),
