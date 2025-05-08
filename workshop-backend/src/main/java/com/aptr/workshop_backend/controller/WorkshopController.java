@@ -86,19 +86,19 @@ public class WorkshopController {
     }
 
     @PatchMapping("/{workshopId}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> editWorkshop(@PathVariable Long workshopId, @RequestBody WorkshopDto workshopDto) {
         return ResponseEntity.ok(workshopService.editWorkshop(workshopId, workshopDto));
     }
 
     @DeleteMapping("/{workshopId}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> softDeleteWorkshop(@PathVariable Long workshopId) {
         return ResponseEntity.ok(workshopService.softDeleteWorkshop(workshopId));
     }
 
     @GetMapping("/{workshopId}/registrations")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ResponseDto<List<AttendeeResponseDto>>> getWorkshopRegistrations(@PathVariable Long workshopId) {
         List<AttendeeResponseDto> registrations = workshopService.getRegistrationsByWorkshopId(workshopId);
         ResponseDto<List<AttendeeResponseDto>> response = new ResponseDto<>(registrations.size(), registrations);
